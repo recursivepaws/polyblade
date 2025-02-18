@@ -147,29 +147,28 @@ impl LRState {
 
     pub fn lr_testing_visitor(&mut self, event: LRTestDfsEvent) -> Result<(), NonPlanar> {
         match event {
-            LRTestDfsEvent::TreeEdge(edge) => {
+            LRTestDfsEvent::TreeEdge(e) => {
                 if let Some(&last) = self.stack.last() {
-                    self.stack_emarker.insert(edge, last);
+                    self.stack_emarker.insert(e, last);
                 }
             }
-            LRTestDfsEvent::BackEdge(edge) => {
+            LRTestDfsEvent::BackEdge(e) => {
                 if let Some(&last) = self.stack.last() {
-                    self.stack_emarker.insert(edge, last);
+                    self.stack_emarker.insert(e, last);
                 }
-                self.low_point_edge.insert(edge, edge);
-                let c_pair = ConflictPair::new(Interval::default(), Interval::new(edge, edge));
+                self.low_point_edge.insert(e, e);
+                let c_pair = ConflictPair::new(Interval::default(), Interval::new(e, e));
                 self.stack.push(c_pair);
             }
-            LRTestDfsEvent::FinishEdge(edge) => {
-                let [v, w] = edge.inner();
-                if self.low_point[&edge] < self.height[&v] {
+            LRTestDfsEvent::FinishEdge(e) => {
+                if self.low_point[&e] < self.height[&e.v()] {
                     // ei has return edge
-                    let e_par = self.edge_parent[&v];
-                    let val = self.low_point_edge[&edge];
+                    let e_par = self.edge_parent[&e.v()];
+                    let val = self.low_point_edge[&e];
 
                     match self.low_point_edge.entry(e_par) {
                         Entry::Occupied(_) => {
-                            self.add_constraints(edge, e_par)?;
+                            self.add_constraints(e, e_par)?;
                         }
                         Entry::Vacant(o) => {
                             o.insert(val);

@@ -1,24 +1,36 @@
 use std::collections::HashSet;
 
+mod control;
+use crate::try_control;
+
 use super::{Distance, Edge, VertexId};
 mod state;
+use control::*;
 use state::{DfsEvent, LRState, LRTestDfsEvent, NonPlanar, Time};
 
 #[cfg(test)]
 mod test;
 
 impl Distance {
-    pub fn is_planar(&self) -> bool {
-        let state = &mut LRState::new(self);
-
+    fn dfs(&self, state: &mut LRState) {
         let time = &mut 0;
         let discovered = &mut HashSet::with_capacity(self.order());
         let finished = &mut HashSet::with_capacity(self.order());
 
         // DFS orientation phase
         for node in self.vertices() {
+            // try_control!(
             dfs_visitor(self.clone(), node, state, discovered, finished, time);
+            // ,
+            //     unreachable!()
+            // );
         }
+    }
+
+    pub fn is_planar(&self) -> bool {
+        let state = &mut LRState::new(self);
+
+        self.dfs(state);
 
         // L-R partition phase
         for v in state.roots.clone() {
@@ -31,20 +43,6 @@ impl Distance {
     }
 }
 
-/// Control flow for `depth_first_search` callbacks.
-#[derive(Copy, Clone, Debug)]
-pub enum Control<B> {
-    /// Continue the DFS traversal as normal.
-    Continue,
-    /// Prune the current node from the DFS traversal. No more edges from this
-    /// node will be reported to the callback. A `DfsEvent::Finish` for this
-    /// node will still be reported. This can be returned in response to any
-    /// `DfsEvent`, except `Finish`, which will panic.
-    Prune,
-    /// Stop the DFS traversal and return the provided value.
-    Break(B),
-}
-
 fn dfs_visitor(
     graph: Distance,
     u: VertexId,
@@ -54,13 +52,18 @@ fn dfs_visitor(
     discovered: &mut HashSet<VertexId>,
     finished: &mut HashSet<VertexId>,
     time: &mut Time,
-) -> Control<usize> {
+) {
     if !discovered.insert(u) {
-        return Control::Continue;
+        return;
     }
     time_post_inc(time);
+
+    // try_control!(state.lr_orientation_visitor(DfsEvent::Discover(u)), {}, {});
+
+    //try_control!(
     state.lr_orientation_visitor(DfsEvent::Discover(u));
 
+    //, {}, {
     let mut stack: Vec<(VertexId, Vec<VertexId>)> = Vec::new();
     stack.push((u, graph.neighbors(u)));
 
@@ -70,25 +73,28 @@ fn dfs_visitor(
             let edge: Edge = [*u, v].into();
             // is_visited
             if !discovered.contains(&v) {
-                //try_control!(visitor(), continue);
-                state.lr_orientation_visitor(DfsEvent::TreeEdge(edge));
+                try_control!(
+                    state.lr_orientation_visitor(DfsEvent::TreeEdge(edge)),
+                    continue
+                );
                 discovered.insert(v);
-                // try_control!(
                 time_post_inc(time);
-                state.lr_orientation_visitor(DfsEvent::Discover(v)); //, time_post_inc(time)));
-                                                                     //     continue
-                                                                     // );
+                try_control!(
+                    state.lr_orientation_visitor(DfsEvent::Discover(v)),
+                    continue
+                );
                 next = Some(v);
                 break;
             } else if !finished.contains(&v) {
-                // try_control!(
-                state.lr_orientation_visitor(DfsEvent::BackEdge(edge));
-                // , continue);
+                try_control!(
+                    state.lr_orientation_visitor(DfsEvent::BackEdge(edge)),
+                    continue
+                );
             } else {
-                // try_control!(
-                state.lr_orientation_visitor(DfsEvent::CrossForwardEdge(edge));
-                //     continue
-                // );
+                try_control!(
+                    state.lr_orientation_visitor(DfsEvent::CrossForwardEdge(edge)),
+                    continue
+                );
             }
         }
 
@@ -98,14 +104,18 @@ fn dfs_visitor(
                 let first_finish = finished.insert(*u);
                 debug_assert!(first_finish);
                 time_post_inc(time);
-                state.lr_orientation_visitor(DfsEvent::Finish(*u));
-                //panic!("Pruning on the `DfsEvent::Finish` is not supported!")
+                try_control!(
+                    state.lr_orientation_visitor(DfsEvent::Finish(*u)),
+                    panic!("Pruning on the `DfsEvent::Finish` is not supported!")
+                );
                 stack.pop();
             }
         };
     }
 
-    Control::Continue
+    //);
+
+    //C::continuing()
 }
 
 fn time_post_inc(x: &mut Time) -> Time {

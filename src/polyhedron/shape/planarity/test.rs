@@ -15,7 +15,17 @@
 // use rustworkx_core::petgraph::graph::UnGraph;
 // use rustworkx_core::planar::is_planar;
 
+use std::collections::HashMap;
+
 use crate::polyhedron::{shape::Distance, Edge, VertexId};
+
+#[test]
+fn edge_hashing() {
+    let mut map: HashMap<Edge, usize> = HashMap::new();
+    map.insert([0, 5].into(), 3);
+    assert_eq!(Some(3), map.get(&[5, 0].into()).copied());
+    assert_eq!(None, map.get(&[4, 0].into()).copied());
+}
 
 #[test]
 fn test_simple_planar_graph() {
