@@ -70,7 +70,7 @@ impl LRState {
         }
     }
 
-    pub fn lr_orientation_visitor(&mut self, event: DfsEvent) {
+    pub fn orientation_visitor(&mut self, event: DfsEvent) {
         match event {
             DfsEvent::Discover(v) => {
                 if let Entry::Vacant(entry) = self.height.entry(v) {
@@ -145,14 +145,17 @@ impl LRState {
         }
     }
 
-    pub fn lr_testing_visitor(&mut self, event: LRTestDfsEvent) -> Result<(), NonPlanar> {
+    pub fn testing_visitor(&mut self, event: LRTestDfsEvent) -> Result<(), NonPlanar> {
         match event {
             LRTestDfsEvent::TreeEdge(e) => {
+                println!("TreeEdge: ({},{})", e.v(), e.w());
                 if let Some(&last) = self.stack.last() {
+                    println!("TreeEdge: inserting emarker ({},{})", e.v(), e.w());
                     self.stack_emarker.insert(e, last);
                 }
             }
             LRTestDfsEvent::BackEdge(e) => {
+                println!("BackEdge: ({},{})", e.v(), e.w());
                 if let Some(&last) = self.stack.last() {
                     self.stack_emarker.insert(e, last);
                 }
@@ -161,6 +164,7 @@ impl LRState {
                 self.stack.push(c_pair);
             }
             LRTestDfsEvent::FinishEdge(e) => {
+                println!("finishing edge {e:?}");
                 if self.low_point[&e] < self.height[&e.v()] {
                     // ei has return edge
                     let e_par = self.edge_parent[&e.v()];
@@ -177,6 +181,7 @@ impl LRState {
                 }
             }
             LRTestDfsEvent::Finish(v) => {
+                println!("finishing {v}");
                 if let Some(&edge) = self.edge_parent.get(&v) {
                     let u = edge.v();
                     self.remove_back_edges(u);

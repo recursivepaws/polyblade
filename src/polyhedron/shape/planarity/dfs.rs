@@ -50,7 +50,7 @@ fn dfs_visitor(
     // try_control!(state.lr_orientation_visitor(DfsEvent::Discover(u)), {}, {});
 
     //try_control!(
-    state.lr_orientation_visitor(DfsEvent::Discover(u));
+    state.orientation_visitor(DfsEvent::Discover(u));
 
     //, {}, {
     let mut stack: Vec<(VertexId, Vec<VertexId>)> = Vec::new();
@@ -63,25 +63,22 @@ fn dfs_visitor(
             // is_visited
             if !discovered.contains(&v) {
                 try_control!(
-                    state.lr_orientation_visitor(DfsEvent::TreeEdge(edge)),
+                    state.orientation_visitor(DfsEvent::TreeEdge(edge)),
                     continue
                 );
                 discovered.insert(v);
                 time_post_inc(time);
-                try_control!(
-                    state.lr_orientation_visitor(DfsEvent::Discover(v)),
-                    continue
-                );
+                try_control!(state.orientation_visitor(DfsEvent::Discover(v)), continue);
                 next = Some(v);
                 break;
             } else if !finished.contains(&v) {
                 try_control!(
-                    state.lr_orientation_visitor(DfsEvent::BackEdge(edge)),
+                    state.orientation_visitor(DfsEvent::BackEdge(edge)),
                     continue
                 );
             } else {
                 try_control!(
-                    state.lr_orientation_visitor(DfsEvent::CrossForwardEdge(edge)),
+                    state.orientation_visitor(DfsEvent::CrossForwardEdge(edge)),
                     continue
                 );
             }
@@ -94,7 +91,7 @@ fn dfs_visitor(
                 debug_assert!(first_finish);
                 time_post_inc(time);
                 try_control!(
-                    state.lr_orientation_visitor(DfsEvent::Finish(*u)),
+                    state.orientation_visitor(DfsEvent::Finish(*u)),
                     panic!("Pruning on the `DfsEvent::Finish` is not supported!")
                 );
                 stack.pop();

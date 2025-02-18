@@ -7,6 +7,7 @@ mod test;
 
 use crate::polyhedron::VertexId;
 use std::{
+    cmp,
     fmt::Display,
     ops::{Index, IndexMut, Range},
 };

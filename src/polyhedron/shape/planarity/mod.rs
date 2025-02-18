@@ -12,6 +12,8 @@ use dfs::*;
 use lr_state::*;
 
 #[cfg(test)]
+mod dfs_test;
+#[cfg(test)]
 mod test;
 
 // Filter edges by key and sort by nesting depth
@@ -40,34 +42,38 @@ fn remaining_edges(w: VertexId, lr_state: &LRState) -> Vec<Edge> {
 fn lr_visit_ordered_dfs_tree(lr_state: &mut LRState, v: VertexId) -> Result<(), NonPlanar> {
     let mut stack: Vec<(VertexId, Vec<Edge>)> = vec![(v, remaining_edges(v, lr_state))];
 
+    println!("stack: {stack:?}");
+
     while let Some(elem) = stack.last_mut() {
         let v = elem.0;
         let adjacent_edges = elem.1.clone();
         let mut next = None;
 
-        {
-            for edge in adjacent_edges {
-                if Some(edge) == lr_state.edge_parent.get(&edge.w()).copied() {
-                    lr_state.lr_testing_visitor(LRTestDfsEvent::TreeEdge(edge))?;
-                    next = Some(edge.w());
-                    break;
-                } else {
-                    lr_state.lr_testing_visitor(LRTestDfsEvent::BackEdge(edge))?;
-                    lr_state.lr_testing_visitor(LRTestDfsEvent::FinishEdge(edge))?;
-                }
+        for edge in adjacent_edges {
+            if Some(&edge) == lr_state.edge_parent.get(&edge.w()) {
+                lr_state.testing_visitor(LRTestDfsEvent::TreeEdge(edge))?;
+                next = Some(edge.w());
+                println!("newstack: {stack:?}");
+                break;
+            } else {
+                lr_state.testing_visitor(LRTestDfsEvent::BackEdge(edge))?;
+                lr_state.testing_visitor(LRTestDfsEvent::FinishEdge(edge))?;
             }
         }
 
         match next {
             Some(w) => {
+                println!("remaining_edges: {:?}", remaining_edges(w, lr_state));
                 stack.push((w, remaining_edges(w, lr_state)));
             }
             None => {
                 stack.pop();
-                lr_state.lr_testing_visitor(LRTestDfsEvent::Finish(v))?;
+                println!("popped stack, finishing {v:?}");
+                lr_state.testing_visitor(LRTestDfsEvent::Finish(v))?;
 
                 if let Some(&edge) = lr_state.edge_parent.get(&v) {
-                    lr_state.lr_testing_visitor(LRTestDfsEvent::FinishEdge(edge))?;
+                    println!("finishing edge.... from eparent {}, {}", edge.v(), edge.w());
+                    lr_state.testing_visitor(LRTestDfsEvent::FinishEdge(edge))?;
                 }
             }
         }
