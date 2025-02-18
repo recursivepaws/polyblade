@@ -2,7 +2,7 @@ mod conway;
 mod platonic;
 mod svg;
 
-#[cfg(test)]
+//#[cfg(test)]
 mod test;
 
 use crate::polyhedron::VertexId;

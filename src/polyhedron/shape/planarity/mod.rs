@@ -4,6 +4,9 @@ use super::{Distance, Edge, VertexId};
 mod state;
 use state::{DfsEvent, LRState, LRTestDfsEvent, NonPlanar, Time};
 
+#[cfg(test)]
+mod test;
+
 impl Distance {
     pub fn is_planar(&self) -> bool {
         let state = &mut LRState::new(self);

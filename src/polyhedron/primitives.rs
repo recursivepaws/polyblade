@@ -35,6 +35,14 @@ impl Edge {
     pub fn inner(&self) -> [VertexId; 2] {
         self.0
     }
+
+    pub fn min(&self) -> VertexId {
+        self.0[0].min(self.0[1])
+    }
+
+    pub fn max(&self) -> VertexId {
+        self.0[0].max(self.0[1])
+    }
 }
 
 impl Index<usize> for Edge {
