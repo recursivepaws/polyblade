@@ -7,7 +7,10 @@ use iced::{
     widget::shader::wgpu::{self, RenderPassDepthStencilAttachment},
     Size,
 };
-use iced_wgpu::wgpu::{DepthBiasState, StencilState};
+use iced_wgpu::wgpu::{
+    CommandEncoder, DepthBiasState, RenderPass, RenderPassColorAttachment, RenderPassDescriptor,
+    StencilState, TextureView,
+};
 use iced_winit::core::Color;
 
 pub use buffer::*;
@@ -23,6 +26,8 @@ pub struct Scene {
     pub frag_buf: Buffer,
     uniform_group: wgpu::BindGroup,
     pub depth_texture: Texture,
+    pub multisample_texture: Texture,
+    // pub resolve_texture: Texture,
 }
 
 impl Scene {
@@ -53,7 +58,10 @@ impl Scene {
                 },
             ],
         });
-        let depth_texture = Texture::depth_texture(device, size);
+        let extent = Texture::extent(size);
+        let depth_texture = Texture::depth_texture(device, extent);
+        let multisample_texture = Texture::multisample_texture(device, extent, texture_format);
+        // let resolve_texture = Texture::resolve_texture(device, extent, texture_format);
 
         Scene {
             pipeline,
@@ -63,20 +71,22 @@ impl Scene {
             frag_buf,
             uniform_group,
             depth_texture,
+            multisample_texture,
+            // resolve_texture,
         }
     }
 
     pub fn clear<'a>(
         &'a self,
-        target: &'a wgpu::TextureView,
-        encoder: &'a mut wgpu::CommandEncoder,
+        encoder: &'a mut CommandEncoder,
+        frame_view: &'a TextureView,
         background_color: Color,
-    ) -> wgpu::RenderPass<'a> {
-        encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+    ) -> RenderPass<'a> {
+        encoder.begin_render_pass(&RenderPassDescriptor {
             label: None,
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: target,
-                resolve_target: None,
+            color_attachments: &[Some(RenderPassColorAttachment {
+                view: &self.multisample_texture.view,
+                resolve_target: Some(&frame_view),
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Clear({
                         let [r, g, b, a] = background_color.into_linear();
@@ -98,7 +108,6 @@ impl Scene {
                 }),
                 stencil_ops: None,
             }),
-            //depth_stencil_attachment: None,
             timestamp_writes: None,
             occlusion_query_set: None,
         })
@@ -194,7 +203,12 @@ impl Scene {
                 stencil: StencilState::default(),
                 bias: DepthBiasState::default(),
             }),
-            multisample: wgpu::MultisampleState::default(),
+            // Using 4× MSAA
+            multisample: wgpu::MultisampleState {
+                count: Texture::SAMPLE_COUNT,
+                mask: !0,
+                alpha_to_coverage_enabled: false,
+            },
             multiview: None,
         })
     }

@@ -23,6 +23,7 @@ use crate::render::{
 
 #[cfg(target_arch = "wasm32")]
 pub use iced::time::Instant;
+use std::error::Error;
 #[cfg(not(target_arch = "wasm32"))]
 pub use std::time::Instant;
 
@@ -150,8 +151,21 @@ impl App<'_> {
 
             // Resize the depth texture as well
             if let Some(data) = &mut self.data {
+                let extent = Texture::extent(&physical_size);
                 data.scene.depth_texture =
-                    Texture::depth_texture(&self.graphics.device, &physical_size);
+                    Texture::depth_texture(&self.graphics.device, extent.clone());
+
+                data.scene.multisample_texture = Texture::multisample_texture(
+                    &self.graphics.device,
+                    extent,
+                    self.graphics.config.format,
+                );
+
+                // data.scene.resolve_texture = Texture::resolve_texture(
+                //     &self.graphics.device,
+                //     extent,
+                //     self.graphics.config.format,
+                // )
             }
 
             // Mark the surface as being configured
@@ -222,8 +236,8 @@ impl App<'_> {
             self.graphics.window.request_redraw();
         }
 
-        let output = self.graphics.surface.get_current_texture()?;
-        let view = output
+        let frame = self.graphics.surface.get_current_texture()?;
+        let frame_view = frame
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
 
@@ -236,7 +250,8 @@ impl App<'_> {
 
         {
             // We clear the frame
-            let mut render_pass = scene.clear(&view, &mut encoder, program.background_color());
+            let mut render_pass =
+                scene.clear(&mut encoder, &frame_view, program.background_color());
 
             // Ignore the whole first polygon if we're in schlegel mode
             let starting_vertex = if program.state.render.schlegel {
@@ -257,15 +272,15 @@ impl App<'_> {
             &self.graphics.queue,
             &mut encoder,
             None,
-            output.texture.format(),
-            &view,
+            frame.texture.format(),
+            &frame_view,
             &self.graphics.viewport,
             &debug.overlay(),
         );
 
         // Then we submit the work
         self.graphics.engine.submit(&self.graphics.queue, encoder);
-        output.present();
+        frame.present();
 
         // Update the mouse cursor interaction
         self.graphics
