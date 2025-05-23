@@ -100,6 +100,7 @@ pub enum RenderMessage {
     ZoomChanged(f32),
     SpeedChanged(f32),
     LineThickness(f32),
+    AntiAliasing(bool),
     ColorMethod(ColorMethodMessage),
     ColorPicker(ColorPickerMessage),
 }
@@ -207,6 +208,18 @@ impl ProcessMessage<RenderState> for RenderMessage {
             }
             LineThickness(thickness) => {
                 state.line_thickness = *thickness;
+                Task::none()
+            }
+            AntiAliasing(increase) => {
+                if *increase {
+                    if state.antialiasing < 8 {
+                        state.antialiasing = state.antialiasing * 2;
+                    }
+                } else {
+                    if state.antialiasing > 1 {
+                        state.antialiasing = state.antialiasing / 2;
+                    }
+                }
                 Task::none()
             }
             ColorMethod(method) => {

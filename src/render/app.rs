@@ -8,22 +8,21 @@ use iced_winit::{
         application::ApplicationHandler,
         dpi::PhysicalPosition,
         event::WindowEvent,
-        event_loop::ActiveEventLoop,
-        event_loop::ControlFlow,
-        keyboard::ModifiersState,
+        event_loop::{ActiveEventLoop, ControlFlow},
+        keyboard::{Key, ModifiersState, NamedKey},
+        platform::modifier_supplement::KeyEventExtModifierSupplement,
         window::{Window, WindowId},
     },
 };
 
 use crate::render::{
     controls::Controls,
-    message::{ConwayMessage, PolybladeMessage, PresetMessage},
+    message::{ConwayMessage, PolybladeMessage, PresetMessage, RenderMessage},
     pipeline::{FragUniforms, ModelUniforms, PolyhedronPrimitive, Scene, Texture},
 };
 
 #[cfg(target_arch = "wasm32")]
 pub use iced::time::Instant;
-use std::error::Error;
 #[cfg(not(target_arch = "wasm32"))]
 pub use std::time::Instant;
 
@@ -359,39 +358,59 @@ impl ApplicationHandler for App<'_> {
                     event_loop.exit();
                 }
                 WindowEvent::KeyboardInput { event, .. } => {
+                    let pressed = event.state.is_pressed();
                     if event.state.is_pressed() {
-                        let Some(key) = &event.text else {
-                            return;
-                        };
-
-                        let message = if key.as_str() == key.to_uppercase().as_str() {
-                            use PresetMessage::*;
-                            match key.to_lowercase().as_str() {
-                                // Presets
-                                "t" => Some(Pyramid(3)),
-                                "c" => Some(Prism(4)),
-                                "o" => Some(Octahedron),
-                                "d" => Some(Dodecahedron),
-                                "i" => Some(Icosahedron),
-                                _ => None,
+                        println!("presed: {}, key: {:?}", pressed, event.logical_key);
+                        let message = match &event.logical_key {
+                            Key::Named(named_key) => {
+                                use RenderMessage::*;
+                                (if named_key == &NamedKey::ArrowDown {
+                                    println!("down arrow, decreasing antialiasing");
+                                    Some(AntiAliasing(false))
+                                } else if named_key == &NamedKey::ArrowUp {
+                                    println!("up arrow, increasing antialiasing");
+                                    Some(AntiAliasing(true))
+                                } else {
+                                    None
+                                })
+                                .map(PolybladeMessage::Render)
                             }
-                            .map(PolybladeMessage::Preset)
-                        } else {
-                            use ConwayMessage::*;
-                            match key.as_str() {
-                                // Operations
-                                "e" => Some(Expand),
-                                "d" => Some(Dual),
-                                "s" => Some(SplitVertex(0)),
-                                "k" => Some(Kis),
-                                "j" => Some(Join),
-                                "a" => Some(Ambo),
-                                "t" => Some(Truncate),
-                                "b" => Some(Bevel),
-                                "c" => Some(Chamfer),
-                                _ => None,
+                            Key::Character(ch) => {
+                                // Represent as str
+                                let txt = ch.as_str();
+                                // If this is uppercase, it's time to reset to a preset
+                                if txt.to_uppercase() == txt {
+                                    use PresetMessage::*;
+                                    match txt {
+                                        // Presets
+                                        "T" => Some(Pyramid(3)),
+                                        "C" => Some(Prism(4)),
+                                        "O" => Some(Octahedron),
+                                        "D" => Some(Dodecahedron),
+                                        "I" => Some(Icosahedron),
+                                        _ => None,
+                                    }
+                                    .map(PolybladeMessage::Preset)
+                                } else {
+                                    use ConwayMessage::*;
+                                    match txt {
+                                        // Operations
+                                        "e" => Some(Expand),
+                                        "d" => Some(Dual),
+                                        "s" => Some(SplitVertex(0)),
+                                        "k" => Some(Kis),
+                                        "j" => Some(Join),
+                                        "a" => Some(Ambo),
+                                        "t" => Some(Truncate),
+                                        "b" => Some(Bevel),
+                                        "c" => Some(Chamfer),
+                                        _ => None,
+                                    }
+                                    .map(PolybladeMessage::Conway)
+                                }
                             }
-                            .map(PolybladeMessage::Conway)
+                            Key::Unidentified(native_key) => None,
+                            Key::Dead(_) => None,
                         };
 
                         if let (Some(message), Some(AppData { state, .. })) =
