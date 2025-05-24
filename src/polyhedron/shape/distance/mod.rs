@@ -1,4 +1,5 @@
 mod conway;
+mod dfs;
 mod platonic;
 mod svg;
 
@@ -107,19 +108,20 @@ impl Distance {
         self.vertex_pairs().map(|e| self[e]).max().unwrap_or(0)
     }
 
-    fn dfs(&self, visited: &mut HashSet<usize>, v: usize) {
-        visited.insert(v);
-        for u in self.neighbors(v) {
-            if !visited.contains(&u) {
-                self.dfs(visited, u);
-            }
-        }
-    }
+    // fn dfs(&self, visited: &mut HashSet<usize>, v: usize) {
+    //     visited.insert(v);
+    //     for u in self.neighbors(v) {
+    //         if !visited.contains(&u) {
+    //             self.dfs(visited, u);
+    //         }
+    //     }
+    // }
 
     fn is_connected(&self) -> bool {
-        let mut visited = HashSet::new();
-        self.dfs(&mut visited, 0);
-        visited.len() == self.order()
+        // let mut visited = HashSet::new();
+        // self.dfs(&mut visited, 0);
+        // visited.len() == self.order()
+        false
     }
 
     /// This functiona and the helpers it relies on should soon be superceded by
