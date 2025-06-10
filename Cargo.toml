@@ -3,65 +3,29 @@ name = "polyblade"
 version = "0.1.0"
 authors = ["Vera Gonzalez <me@vera.lgbt>"]
 edition = "2021"
-license-file = "LICENSE"
-description = "Make shapes dance."
-repository = "https://github.com/organizedgrime/polyblade"
-readme = "README.md"
-keywords = ["polyhedra", "graphics", "graphs", "WebGPU"]
-categories = [
-	"graphics",
-	"mathematics",
-	"visualization",
-	"wasm",
-	"web-programming",
-]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bytemuck = { version = "1.0", features = [
-	"derive",
-	"zeroable_maybe_uninit",
-	"zeroable_atomics",
-] }
+dioxus = { version = "0.6.0", features = ["router", "fullstack"] }
 
-iced_aw = { version = "0.11.0", default-features = false, features = ["menu"] }
+[features]
+default = ["web"]
+# The feature that are only required for the web = ["dioxus/web"] build target should be optional and only enabled in the web = ["dioxus/web"] feature
+web = ["dioxus/web"]
+# The feature that are only required for the desktop = ["dioxus/desktop"] build target should be optional and only enabled in the desktop = ["dioxus/desktop"] feature
+desktop = ["dioxus/desktop"]
+# The feature that are only required for the mobile = ["dioxus/mobile"] build target should be optional and only enabled in the mobile = ["dioxus/mobile"] feature
+mobile = ["dioxus/mobile"]
 
-# Enum iteration
-strum = { version = "0.26.2" }
-strum_macros = { version = "0.26.2" }
+[profile]
 
-# Vector and Matrix math
-ultraviolet = { version = "0.9.2", features = ["bytemuck"] }
-rand = { version = "0.8.5" }
-serde = { version = "^1.0.0", features = ["derive"] }
-ron = { version = "0.8" }
-#ckmeans = { version = "1.0.6" }
-webbrowser = { version = "1.0.2" }
-iced_winit = { version = "0.13" }
-iced_widget = { version = "0.13", features = ["wgpu"] }
-iced_wgpu = { version = "0.13", features = ["webgl"] }
-log = "0.4.22"
-rustc-hash = "2.0.0"
+[profile.wasm-dev]
+inherits = "dev"
+opt-level = 1
 
-[dev-dependencies]
-test-case = { version = "^3.3.0" }
+[profile.server-dev]
+inherits = "dev"
 
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-iced = { version = "0.13", features = ["debug", "advanced", "svg"] }
-tracing-subscriber = { version = "0.3" }
-
-[target.'cfg(target_arch = "wasm32")'.dependencies]
-getrandom = { version = "0.2", features = ["js"] }
-web-sys = { version = "0.3", features = ["Document", "Window", "Element"] }
-wasm-bindgen = { version = "0.2" }
-iced = { version = "0.13", features = [
-	"debug",
-	"advanced",
-	"svg",
-	"webgl",
-	"debug",
-] }
-console_error_panic_hook = { version = "0.1" }
-console_log = { version = "1.0" }
-
-[profile.release]
-debug = true
+[profile.android-dev]
+inherits = "dev"
