@@ -15,20 +15,14 @@ pub fn Echo() -> Element {
     rsx! {
         document::Link { rel: "stylesheet", href: ECHO_CSS }
 
-        div {
-            id: "echo",
+        div { id: "echo",
             h4 { "ServerFn Echo" }
             input {
                 placeholder: "Type here to echo...",
                 // `oninput` is an event handler that will run when the input changes. It can return either nothing or a future
                 // that will be run when the event runs.
-                oninput:  move |event| async move {
-                    // When we call the echo_server function from the client, it will fire a request to the server and return
-                    // the response. It handles serialization and deserialization of the request and response for us.
+                oninput: move |event| async move {
                     let data = echo_server(event.value()).await.unwrap();
-
-                    // After we have the data from the server, we can set the state of the signal to the new value.
-                    // Since we read the `response` signal later in this component, the component will rerun.
                     response.set(data);
                 },
             }
