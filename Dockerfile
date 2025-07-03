@@ -12,8 +12,8 @@ RUN cargo chef cook --release --recipe-path recipe.json
 COPY . .
 
 # Install `dx`
-RUN curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
-RUN cargo binstall dioxus-cli@0.7.0-alpha.1 --root /.cargo --locked -y --force
+# RUN curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+RUN cargo install dioxus-cli@0.7.0-alpha.2 --root /.cargo --locked --force
 ENV PATH="/.cargo/bin:$PATH"
 
 # Create the final bundle folder. Bundle always executes in release mode with optimizations enabled
@@ -30,4 +30,4 @@ ENV IP=0.0.0.0
 EXPOSE 8080
 
 WORKDIR /usr/local/app
-ENTRYPOINT [ "/usr/local/app/server" ]
+ENTRYPOINT [ "/usr/local/app/polyblade" ]

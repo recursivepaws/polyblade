@@ -3,7 +3,7 @@ use log::info;
 use ultraviolet::Vec3;
 use wgpu::wgt::DeviceDescriptor;
 
-#[cfg(feature = "web")]
+#[cfg(target_arch = "wasm32")]
 use wgpu::SurfaceTarget::Canvas;
 
 use wgpu::{
@@ -23,10 +23,14 @@ impl<'window> WGPUInstance<'window> {
     pub async fn new(target: SurfaceTarget<'window>) -> Self {
         let target: SurfaceTarget<'window> = target.into();
 
-        let (width, height) = match &target {
-            Canvas(canvas) => (canvas.width(), canvas.height()),
-            _ => (1, 1),
-        };
+        let mut width = 1;
+        let mut height = 1;
+
+        #[cfg(target_arch = "wasm32")]
+        if let Canvas(canvas) = &target {
+            width = canvas.width();
+            height = canvas.height();
+        }
 
         let instance = Instance::default();
         info!("wgpu instance created");

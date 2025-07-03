@@ -104,15 +104,15 @@ pub fn Line() -> Element {
             color: Vec3::new(0.0, 0.0, 1.0),
         },
     ];
-    let t2 = triangle.clone();
     use_effect(move || {
         // canvas.set(get_canvas("line-canvas"));
         if let Some(el) = polyblade::get_canvas(&canvas_id) {
             let tri = triangle.clone();
+
+            #[cfg(target_arch = "wasm32")]
             spawn(async move {
                 let gpu = WGPUInstance::new(SurfaceTarget::Canvas(el)).await;
                 info!("wgpu_instance created");
-
                 let renderer = Renderer::new(&gpu, &tri);
                 renderer.render(&gpu);
             });
