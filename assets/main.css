@@ -1,0 +1,88 @@
+body {
+  background-color: #0f1116;
+  color: #ffffff;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  margin: 20px;
+}
+
+#header {
+  max-width: 1200px;
+}
+
+body {
+  background: #0f172a;
+  color: #d1d5db;
+}
+
+.menu-bar {
+  background: #1e293b;
+  padding: 8px 16px;
+  display: flex;
+  gap: 4px;
+}
+
+.menu-group {
+  position: relative;
+}
+
+.menu-btn {
+  background: #374151;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.menu-btn:hover {
+  background: #4b5563;
+}
+
+.dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background: #374151;
+  min-width: 200px;
+  padding: 4px 0;
+  display: none;
+}
+
+.menu-group:hover .dropdown {
+  display: block;
+}
+
+.item {
+  padding: 8px 16px;
+  cursor: pointer;
+  position: relative;
+}
+
+.item:hover {
+  background: #4b5563;
+}
+
+.shortcut {
+  float: right;
+  color: #9ca3af;
+}
+
+.submenu {
+  position: absolute;
+  left: 100%;
+  top: 0;
+  background: #374151;
+  min-width: 180px;
+  padding: 4px 0;
+  display: none;
+}
+
+.item:hover .submenu {
+  display: block;
+}
+
+.has-sub::after {
+  content: "▶";
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  font-size: 10px;
+}

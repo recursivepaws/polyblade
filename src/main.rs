@@ -1,13 +1,30 @@
-// The dioxus prelude contains a ton of common items used in dioxus apps. It's a good idea to import wherever you
-// need dioxus
+use dioxus::logger::tracing::info;
 use dioxus::prelude::*;
+use polyblade::graphics::{Vertex, WGPUInstance};
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
+use ultraviolet::Vec3;
+use wgpu::util::{BufferInitDescriptor, DeviceExt};
+use wgpu::wgt::{CommandEncoderDescriptor, TextureViewDescriptor};
+use wgpu::PrimitiveTopology::{LineList, PointList};
+use wgpu::{
+    include_wgsl, BlendState, Buffer, BufferUsages, Color, ColorTargetState, ColorWrites,
+    FragmentState, LoadOp, Operations, PipelineLayoutDescriptor, PrimitiveState,
+    RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor,
+    StoreOp, SurfaceTarget, VertexState,
+};
 
-/// Define a components module that contains all shared components for our app.
-mod components;
-/// Define a views module that contains the UI for all Layouts and Routes for our app.
-mod views;
+#[derive(Debug, Clone, Routable, PartialEq)]
+#[rustfmt::skip]
+enum Route {
+    #[layout(Navbar)]
+    #[route("/")]
+    Home {},
+}
+
+const FAVICON: Asset = asset!("/assets/favicon.ico");
+const MAIN_CSS: Asset = asset!("/assets/main.css");
+const TAILWIND_CSS: Asset = asset!("/assets/tailwind.css");
 
 #[derive(Debug, Clone, EnumIter, PartialEq, Display)]
 enum Platonic {
@@ -18,32 +35,33 @@ enum Platonic {
     Icosahedron,
 }
 
-// We can import assets in dioxus with the `asset!` macro. This macro takes a path to an asset relative to the crate root.
-// The macro returns an `Asset` type that will display as the path to the asset in the browser or a local path in desktop bundles.
-const FAVICON: Asset = asset!("/assets/favicon.ico");
-// The asset macro also minifies some assets like CSS and JS to make bundled smaller
-const MAIN_CSS: Asset = asset!("/assets/styling/main.css");
-const TAILWIND_CSS: Asset = asset!("/assets/tailwind.css");
-
 fn main() {
-    // The `launch` function is the main entry point for a dioxus app. It takes a component and renders it with the platform feature
-    // you have enabled
-    dioxus::launch(App);
+    wasm_logger::init(wasm_logger::Config::default());
+    launch(App);
 }
 
-/// App is the main component of our app. Components are the building blocks of dioxus apps. Each component is a function
-/// that takes some props and returns an Element. In this case, App takes no props because it is the root of our app.
-///
-/// Components should be annotated with `#[component]` to support props, better error messages, and autocomplete
 #[component]
 fn App() -> Element {
-    // The `rsx!` macro lets us define HTML inside of rust. It expands to an Element with all of our HTML inside.
     rsx! {
-        // In addition to element and text (which we will see later), rsx can contain other components. In this case,
-        // we are using the `document::Link` component to add a link to our favicon and main CSS file into the head of our app.
         document::Link { rel: "icon", href: FAVICON }
         document::Link { rel: "stylesheet", href: MAIN_CSS }
-        document::Link { rel: "stylesheet", href: TAILWIND_CSS }
+        document::Stylesheet { href: TAILWIND_CSS }
+        Router::<Route> {}
+    }
+}
+
+/// Shared navbar component.
+#[component]
+fn Navbar() -> Element {
+    rsx! {
+        Outlet::<Route> {}
+    }
+}
+
+/// Home page
+#[component]
+fn Home() -> Element {
+    rsx! {
 
         div { class: "menu-bar",
             div { class: "menu-group",
@@ -64,5 +82,157 @@ fn App() -> Element {
                 }
             }
         }
+
+        h1 { class: "text-4xl text-center py-4", "Polyblade, the movie!" }
+        div { class: "h-svh flex place-content-center place-items-center", Lines {} }
+    }
+}
+
+#[component]
+pub fn Lines() -> Element {
+    // let mut canvas = use_signal(|| None);
+
+    let lines = vec![
+        (Vec3::new(-0.5, 0., 0.), Vec3::new(0.5, 0., 0.)),
+        (Vec3::new(0., -0.5, 0.), Vec3::new(0., 0.5, 0.)),
+        (Vec3::new(-0.5, 0.5, 0.), Vec3::new(0.5, -0.5, 0.)),
+        (Vec3::new(0.5, 0.5, 0.), Vec3::new(-0.5, -0.5, 0.)),
+    ];
+
+    let lines2 = lines.clone();
+    use_effect(move || {
+        // canvas.set(get_canvas("line-canvas"));
+        for (i, &v) in lines2.iter().enumerate() {
+            let id = format! {"canvas-{}", i};
+            if let Some(el) = polyblade::get_canvas(&id) {
+                let (start, end) = v;
+                spawn(async move {
+                    let gpu = WGPUInstance::new(SurfaceTarget::Canvas(el)).await;
+                    info!("{} wgpu_instance created", id);
+
+                    let line = LineSegment {
+                        start: Vertex { position: start },
+                        end: Vertex { position: end },
+                    };
+                    let renderer = Renderer::new(&gpu, &line);
+                    renderer.render(&gpu);
+                });
+            } else {
+                info!("failed to find canvas.")
+            }
+        }
+    });
+
+    rsx! {
+        div { class: "grid grid-cols-4 gap-4",
+            for (i , _) in lines.iter().enumerate() {
+                canvas { id: format!("canvas-{}", i), width: 200, height: 200 }
+            }
+        }
+    }
+}
+
+#[derive(Copy, Clone)]
+struct LineSegment {
+    start: Vertex,
+    end: Vertex,
+}
+
+struct Renderer {
+    vertex_buffer: Buffer,
+    pipeline: RenderPipeline,
+}
+
+impl Renderer {
+    pub fn new(gpu: &WGPUInstance, model: &LineSegment) -> Self {
+        let vertex_buffer = gpu.device.create_buffer_init(&BufferInitDescriptor {
+            label: Some("Vertex Buff"),
+            contents: bytemuck::cast_slice(&vec![model.start, model.end]),
+            usage: BufferUsages::VERTEX,
+        });
+
+        let shader = gpu
+            .device
+            .create_shader_module(include_wgsl!("shaders/shader.wgsl"));
+
+        let layout = gpu
+            .device
+            .create_pipeline_layout(&PipelineLayoutDescriptor {
+                label: Some("Render Pipeline Layout"),
+                bind_group_layouts: &[],
+                push_constant_ranges: &[],
+            });
+
+        let pipeline = gpu
+            .device
+            .create_render_pipeline(&RenderPipelineDescriptor {
+                label: Some("Render Pipeline"),
+                layout: Some(&layout),
+                vertex: VertexState {
+                    module: &shader,
+                    entry_point: Some("vs_main"),
+                    buffers: &[Vertex::desc()],
+                    compilation_options: Default::default(),
+                },
+                fragment: Some(FragmentState {
+                    module: &shader,
+                    entry_point: Some("fs_main"),
+                    targets: &[Some(ColorTargetState {
+                        format: gpu.config.format,
+                        blend: Some(BlendState::REPLACE),
+                        write_mask: ColorWrites::ALL,
+                    })],
+                    compilation_options: Default::default(),
+                }),
+                primitive: PrimitiveState {
+                    topology: LineList,
+                    ..Default::default()
+                },
+                depth_stencil: None,
+                multisample: Default::default(),
+                multiview: None,
+                cache: None,
+            });
+
+        Self {
+            vertex_buffer,
+            pipeline,
+        }
+    }
+
+    pub fn render(&self, gpu: &WGPUInstance) {
+        let frame = gpu.surface.get_current_texture().unwrap();
+
+        let view = frame.texture.create_view(&TextureViewDescriptor::default());
+
+        let mut encoder = gpu
+            .device
+            .create_command_encoder(&CommandEncoderDescriptor {
+                label: Some("Command Encoder"),
+            });
+
+        {
+            let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
+                label: Some("Render Pass"),
+                color_attachments: &[Some(RenderPassColorAttachment {
+                    view: &view,
+                    resolve_target: None,
+                    ops: Operations {
+                        load: LoadOp::Clear(Color::BLACK),
+                        store: StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            });
+
+            render_pass.set_pipeline(&self.pipeline);
+            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+            render_pass.draw(0..2, 0..1);
+        }
+
+        gpu.queue.submit(Some(encoder.finish()));
+        frame.present();
     }
 }
