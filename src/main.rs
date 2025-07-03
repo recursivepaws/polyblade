@@ -6,7 +6,7 @@ use strum_macros::{Display, EnumIter};
 use ultraviolet::Vec3;
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
 use wgpu::wgt::{CommandEncoderDescriptor, TextureViewDescriptor};
-use wgpu::PrimitiveTopology::{LineList, PointList};
+use wgpu::PrimitiveTopology::{PointList, TriangleList};
 use wgpu::{
     include_wgsl, BlendState, Buffer, BufferUsages, Color, ColorTargetState, ColorWrites,
     FragmentState, LoadOp, Operations, PipelineLayoutDescriptor, PrimitiveState,
@@ -89,21 +89,31 @@ fn Home() -> Element {
 #[component]
 pub fn Line() -> Element {
     let canvas_id = "wgpu_canvas";
-    let line = (Vec3::new(-0.5, 0.5, 0.), Vec3::new(0.5, -0.5, 0.));
-    let line2 = line.clone();
+
+    let triangle: Triangle = vec![
+        Vertex {
+            position: Vec3::new(0.0, 0.5, 0.0),
+            color: Vec3::new(1.0, 0.0, 0.0),
+        },
+        Vertex {
+            position: Vec3::new(-0.5, -0.5, 0.0),
+            color: Vec3::new(0.0, 1.0, 0.0),
+        },
+        Vertex {
+            position: Vec3::new(0.5, -0.5, 0.0),
+            color: Vec3::new(0.0, 0.0, 1.0),
+        },
+    ];
+    let t2 = triangle.clone();
     use_effect(move || {
         // canvas.set(get_canvas("line-canvas"));
         if let Some(el) = polyblade::get_canvas(&canvas_id) {
-            let (start, end) = line2;
+            let tri = triangle.clone();
             spawn(async move {
                 let gpu = WGPUInstance::new(SurfaceTarget::Canvas(el)).await;
                 info!("wgpu_instance created");
 
-                let line = LineSegment {
-                    start: Vertex { position: start },
-                    end: Vertex { position: end },
-                };
-                let renderer = Renderer::new(&gpu, &line);
+                let renderer = Renderer::new(&gpu, &tri);
                 renderer.render(&gpu);
             });
         } else {
@@ -116,11 +126,7 @@ pub fn Line() -> Element {
     }
 }
 
-#[derive(Copy, Clone)]
-struct LineSegment {
-    start: Vertex,
-    end: Vertex,
-}
+type Triangle = Vec<Vertex>;
 
 struct Renderer {
     vertex_buffer: Buffer,
@@ -128,10 +134,10 @@ struct Renderer {
 }
 
 impl Renderer {
-    pub fn new(gpu: &WGPUInstance, model: &LineSegment) -> Self {
+    pub fn new(gpu: &WGPUInstance, model: &Triangle) -> Self {
         let vertex_buffer = gpu.device.create_buffer_init(&BufferInitDescriptor {
             label: Some("Vertex Buff"),
-            contents: bytemuck::cast_slice(&vec![model.start, model.end]),
+            contents: bytemuck::cast_slice(&model),
             usage: BufferUsages::VERTEX,
         });
 
@@ -169,7 +175,7 @@ impl Renderer {
                     compilation_options: Default::default(),
                 }),
                 primitive: PrimitiveState {
-                    topology: LineList,
+                    topology: TriangleList,
                     ..Default::default()
                 },
                 depth_stencil: None,
@@ -213,7 +219,7 @@ impl Renderer {
 
             render_pass.set_pipeline(&self.pipeline);
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-            render_pass.draw(0..2, 0..1);
+            render_pass.draw(0..3, 0..1);
         }
 
         gpu.queue.submit(Some(encoder.finish()));

@@ -73,10 +73,14 @@ impl<'window> WGPUInstance<'window> {
 #[derive(Pod, Zeroable, Copy, Clone, Debug)]
 pub struct Vertex {
     pub position: Vec3,
+    pub color: Vec3,
 }
 
 impl Vertex {
-    const ATTRIBS: [VertexAttribute; 1] = vertex_attr_array![0 => Float32x2];
+    const ATTRIBS: [VertexAttribute; 2] = vertex_attr_array![
+        0 => Float32x3,
+        1 => Float32x3
+    ];
 
     pub fn desc() -> VertexBufferLayout<'static> {
         VertexBufferLayout {
