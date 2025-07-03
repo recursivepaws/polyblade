@@ -6,12 +6,12 @@ use strum_macros::{Display, EnumIter};
 use ultraviolet::Vec3;
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
 use wgpu::wgt::{CommandEncoderDescriptor, TextureViewDescriptor};
-use wgpu::PrimitiveTopology::{PointList, TriangleList};
+use wgpu::PrimitiveTopology::TriangleList;
 use wgpu::{
     include_wgsl, BlendState, Buffer, BufferUsages, Color, ColorTargetState, ColorWrites,
     FragmentState, LoadOp, Operations, PipelineLayoutDescriptor, PrimitiveState,
     RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor,
-    StoreOp, SurfaceTarget, VertexState,
+    StoreOp, VertexState,
 };
 
 #[derive(Debug, Clone, Routable, PartialEq)]
@@ -54,26 +54,29 @@ fn App() -> Element {
 #[component]
 fn Navbar() -> Element {
     rsx! {
-        div { class: "menu-bar",
-            div { class: "menu-group",
-                div { class: "menu-btn", "File" }
-                div { class: "dropdown",
-                    div { class: "item",
-                        "Open"
-                        span { class: "shortcut", "#O" }
-                    }
-                    div { class: "item has-sub",
-                        "Recent"
-                        div { class: "submenu",
-                            for preset in Platonic::iter() {
-                                div { class: "item", "file_{preset}.doc" }
+        div { class: "main-div",
+            div { class: "menu-bar",
+                div { class: "menu-group",
+                    div { class: "menu-btn", "File" }
+                    div { class: "dropdown",
+                        div { class: "item",
+                            "Open"
+                            span { class: "shortcut", "#O" }
+                        }
+
+                        div { class: "item has-sub",
+                            "Recent"
+                            div { class: "submenu",
+                                for preset in Platonic::iter() {
+                                    div { class: "item", "file_{preset}.doc" }
+                                }
                             }
                         }
                     }
                 }
             }
+            Outlet::<Route> {}
         }
-        Outlet::<Route> {}
     }
 }
 
@@ -81,8 +84,7 @@ fn Navbar() -> Element {
 #[component]
 fn Home() -> Element {
     rsx! {
-        h1 { class: "text-4xl text-center py-4", "Polyblade, the movie!" }
-        div { class: "h-svh flex place-content-center place-items-center", Line {} }
+        Line {}
     }
 }
 
@@ -122,7 +124,15 @@ pub fn Line() -> Element {
     });
 
     rsx! {
-        canvas { id: canvas_id, width: 1000, height: 1000 }
+        div { class: "canvas-div",
+            canvas { id: canvas_id, width: 1000, height: 1000 }
+            canvas {
+                id: "backup_canvas",
+                background_color: "green",
+                width: 1000,
+                height: 1000,
+            }
+        }
     }
 }
 
