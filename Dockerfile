@@ -17,7 +17,7 @@ RUN cargo install dioxus-cli --git https://github.com/DioxusLabs/dioxus.git --re
 ENV PATH="/.cargo/bin:$PATH"
 
 # Create the final bundle folder. Bundle always executes in release mode with optimizations enabled
-RUN dx bundle --platform web
+RUN dx bundle --release --platform web
 
 FROM chef AS runtime
 COPY --from=builder /app/target/dx/polyblade/release/web/ /usr/local/app
