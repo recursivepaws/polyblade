@@ -13,7 +13,7 @@ COPY . .
 
 # Install `dx`
 RUN curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
-RUN cargo binstall dioxus-cli@0.7.0-alpha.1 --root /.cargo --locked --force
+RUN cargo binstall dioxus-cli@0.7.0-alpha.1 --root /.cargo --locked -y --force
 ENV PATH="/.cargo/bin:$PATH"
 
 # Create the final bundle folder. Bundle always executes in release mode with optimizations enabled
