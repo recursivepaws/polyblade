@@ -54,15 +54,6 @@ fn App() -> Element {
 #[component]
 fn Navbar() -> Element {
     rsx! {
-        Outlet::<Route> {}
-    }
-}
-
-/// Home page
-#[component]
-fn Home() -> Element {
-    rsx! {
-
         div { class: "menu-bar",
             div { class: "menu-group",
                 div { class: "menu-btn", "File" }
@@ -82,53 +73,46 @@ fn Home() -> Element {
                 }
             }
         }
+        Outlet::<Route> {}
+    }
+}
 
+/// Home page
+#[component]
+fn Home() -> Element {
+    rsx! {
         h1 { class: "text-4xl text-center py-4", "Polyblade, the movie!" }
-        div { class: "h-svh flex place-content-center place-items-center", Lines {} }
+        div { class: "h-svh flex place-content-center place-items-center", Line {} }
     }
 }
 
 #[component]
-pub fn Lines() -> Element {
-    // let mut canvas = use_signal(|| None);
-
-    let lines = vec![
-        (Vec3::new(-0.5, 0., 0.), Vec3::new(0.5, 0., 0.)),
-        (Vec3::new(0., -0.5, 0.), Vec3::new(0., 0.5, 0.)),
-        (Vec3::new(-0.5, 0.5, 0.), Vec3::new(0.5, -0.5, 0.)),
-        (Vec3::new(0.5, 0.5, 0.), Vec3::new(-0.5, -0.5, 0.)),
-    ];
-
-    let lines2 = lines.clone();
+pub fn Line() -> Element {
+    let canvas_id = "wgpu_canvas";
+    let line = (Vec3::new(-0.5, 0.5, 0.), Vec3::new(0.5, -0.5, 0.));
+    let line2 = line.clone();
     use_effect(move || {
         // canvas.set(get_canvas("line-canvas"));
-        for (i, &v) in lines2.iter().enumerate() {
-            let id = format! {"canvas-{}", i};
-            if let Some(el) = polyblade::get_canvas(&id) {
-                let (start, end) = v;
-                spawn(async move {
-                    let gpu = WGPUInstance::new(SurfaceTarget::Canvas(el)).await;
-                    info!("{} wgpu_instance created", id);
+        if let Some(el) = polyblade::get_canvas(&canvas_id) {
+            let (start, end) = line2;
+            spawn(async move {
+                let gpu = WGPUInstance::new(SurfaceTarget::Canvas(el)).await;
+                info!("wgpu_instance created");
 
-                    let line = LineSegment {
-                        start: Vertex { position: start },
-                        end: Vertex { position: end },
-                    };
-                    let renderer = Renderer::new(&gpu, &line);
-                    renderer.render(&gpu);
-                });
-            } else {
-                info!("failed to find canvas.")
-            }
+                let line = LineSegment {
+                    start: Vertex { position: start },
+                    end: Vertex { position: end },
+                };
+                let renderer = Renderer::new(&gpu, &line);
+                renderer.render(&gpu);
+            });
+        } else {
+            info!("failed to find canvas.")
         }
     });
 
     rsx! {
-        div { class: "grid grid-cols-4 gap-4",
-            for (i , _) in lines.iter().enumerate() {
-                canvas { id: format!("canvas-{}", i), width: 200, height: 200 }
-            }
-        }
+        canvas { id: canvas_id, width: 1000, height: 1000 }
     }
 }
 
