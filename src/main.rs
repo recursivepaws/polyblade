@@ -93,8 +93,6 @@ fn Home() -> Element {
 
 #[component]
 pub fn Line() -> Element {
-    let canvas_id = "wgpu_canvas";
-
     let triangle: Triangle = vec![
         Vertex {
             position: Vec3::new(0.0, 0.5, 0.0),
@@ -112,7 +110,7 @@ pub fn Line() -> Element {
 
     #[cfg(target_arch = "wasm32")]
     use_effect(move || {
-        if let Some(el) = polyblade::get_canvas(&canvas_id) {
+        if let Some(el) = polyblade::get_canvas(&"wgpu-canvas") {
             let tri = triangle.clone();
 
             spawn(async move {
@@ -128,9 +126,9 @@ pub fn Line() -> Element {
 
     rsx! {
         div { class: "canvas-div",
-            canvas { id: canvas_id, width: 1000, height: 1000 }
+            canvas { id: "wgpu-canvas", width: 1000, height: 1000 }
             canvas {
-                id: "backup_canvas",
+                id: "backup-canvas",
                 background_color: "green",
                 width: 1000,
                 height: 1000,

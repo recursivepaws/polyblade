@@ -97,11 +97,11 @@ canvas {
   background_color: #ff00ff;
 }
 
-#wgpu_canvas {
+#wgpu-canvas {
   z-index: 1;
 }
 
-#backup_canvas {
+#backup-canvas {
   z-index: 0;
 }
 
