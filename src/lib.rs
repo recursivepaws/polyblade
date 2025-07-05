@@ -13,4 +13,3 @@ pub fn get_canvas(id: &str) -> Option<HtmlCanvasElement> {
             .and_then(|el| el.dyn_into::<HtmlCanvasElement>().ok())
     })
 }
-

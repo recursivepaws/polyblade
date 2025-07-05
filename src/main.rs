@@ -1,4 +1,3 @@
-use dioxus::logger::tracing::info;
 use dioxus::prelude::*;
 use polyblade::graphics::{Vertex, WGPUInstance};
 use strum::IntoEnumIterator;
@@ -7,14 +6,15 @@ use ultraviolet::Vec3;
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
 use wgpu::wgt::{CommandEncoderDescriptor, TextureViewDescriptor};
 use wgpu::PrimitiveTopology::TriangleList;
-#[cfg(target_arch = "wasm32")]
-use wgpu::SurfaceTarget::Canvas;
 use wgpu::{
     include_wgsl, BlendState, Buffer, BufferUsages, Color, ColorTargetState, ColorWrites,
     FragmentState, LoadOp, Operations, PipelineLayoutDescriptor, PrimitiveState,
     RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor,
     StoreOp, VertexState,
 };
+
+#[cfg(target_arch = "wasm32")]
+use {log::info, wgpu::SurfaceTarget::Canvas};
 
 #[derive(Debug, Clone, Routable, PartialEq)]
 #[rustfmt::skip]
@@ -47,7 +47,7 @@ fn main() {
 fn App() -> Element {
     rsx! {
         document::Link { rel: "icon", href: FAVICON }
-        document::Link { rel: "stylesheet", href: MAIN_CSS }
+        document::Stylesheet { href: MAIN_CSS }
         document::Stylesheet { href: TAILWIND_CSS }
         Router::<Route> {}
     }
@@ -109,8 +109,9 @@ pub fn Line() -> Element {
             color: Vec3::new(0.0, 0.0, 1.0),
         },
     ];
+
+    #[cfg(target_arch = "wasm32")]
     use_effect(move || {
-        #[cfg(target_arch = "wasm32")]
         if let Some(el) = polyblade::get_canvas(&canvas_id) {
             let tri = triangle.clone();
 
