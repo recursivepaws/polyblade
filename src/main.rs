@@ -1,4 +1,6 @@
+use cfg_if::cfg_if;
 use dioxus::prelude::*;
+use log::info;
 use polyblade::{
     graphics::{Vertex, WGPUInstance},
     renderer::{Renderer, Triangle},
@@ -8,7 +10,9 @@ use strum_macros::{Display, EnumIter};
 use ultraviolet::Vec3;
 
 #[cfg(target_arch = "wasm32")]
-use {log::info, wgpu::SurfaceTarget::Canvas};
+use wgpu::SurfaceTarget::Canvas;
+
+// #[cfg(not(target_arch = "wasm32"))]
 
 #[derive(Debug, Clone, Routable, PartialEq)]
 #[rustfmt::skip]
@@ -32,8 +36,14 @@ enum Platonic {
 }
 
 fn main() {
-    #[cfg(target_arch = "wasm32")]
-    wasm_logger::init(wasm_logger::Config::default());
+    cfg_if! {
+        if #[cfg(target_arch = "wasm32")] {
+            console_log::init();
+        } else {
+            colog::init();
+        }
+    }
+
     launch(App);
 }
 
@@ -81,12 +91,12 @@ fn Navbar() -> Element {
 #[component]
 fn Home() -> Element {
     rsx! {
-        Line {}
+        SpinningCube {}
     }
 }
 
 #[component]
-pub fn Line() -> Element {
+pub fn SpinningCube() -> Element {
     let triangle: Triangle = vec![
         Vertex {
             position: Vec3::new(0.0, 0.5, 0.0),
