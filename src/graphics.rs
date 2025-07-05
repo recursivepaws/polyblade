@@ -1,10 +1,9 @@
 use bytemuck::{Pod, Zeroable};
-use log::info;
 use ultraviolet::Vec3;
 use wgpu::wgt::DeviceDescriptor;
 
 #[cfg(target_arch = "wasm32")]
-use wgpu::SurfaceTarget::Canvas;
+use {log::info, wgpu::SurfaceTarget::Canvas};
 
 use wgpu::{
     vertex_attr_array, BufferAddress, Device, Instance, PowerPreference, Queue,
@@ -33,10 +32,10 @@ impl<'window> WGPUInstance<'window> {
         }
 
         let instance = Instance::default();
-        info!("wgpu instance created");
+        // info!("wgpu instance created");
 
         let surface = instance.create_surface(target).unwrap();
-        info!("wgpu surface created");
+        // info!("wgpu surface created");
 
         let adapter = instance
             .request_adapter(&RequestAdapterOptions {
@@ -46,7 +45,7 @@ impl<'window> WGPUInstance<'window> {
             })
             .await
             .unwrap();
-        info!("wgpu adapter created");
+        // info!("wgpu adapter created");
 
         let (device, queue) = adapter
             .request_device(&DeviceDescriptor {
@@ -58,7 +57,7 @@ impl<'window> WGPUInstance<'window> {
             })
             .await
             .unwrap();
-        info!("wgpu device and queue created.");
+        // info!("wgpu device and queue created.");
 
         let config = surface.get_default_config(&adapter, width, height).unwrap();
 

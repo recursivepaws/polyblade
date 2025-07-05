@@ -17,7 +17,7 @@ RUN cargo install dioxus-cli@0.7.0-alpha.2 --root /.cargo --locked --force
 ENV PATH="/.cargo/bin:$PATH"
 
 # Create the final bundle folder. Bundle always executes in release mode with optimizations enabled
-RUN dx bundle --release --platform web
+RUN dx bundle --release --features fullstack
 
 FROM chef AS runtime
 COPY --from=builder /app/target/dx/polyblade/release/web/ /usr/local/app

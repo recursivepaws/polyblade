@@ -7,6 +7,8 @@ use ultraviolet::Vec3;
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
 use wgpu::wgt::{CommandEncoderDescriptor, TextureViewDescriptor};
 use wgpu::PrimitiveTopology::TriangleList;
+#[cfg(target_arch = "wasm32")]
+use wgpu::SurfaceTarget::Canvas;
 use wgpu::{
     include_wgsl, BlendState, Buffer, BufferUsages, Color, ColorTargetState, ColorWrites,
     FragmentState, LoadOp, Operations, PipelineLayoutDescriptor, PrimitiveState,
@@ -36,6 +38,7 @@ enum Platonic {
 }
 
 fn main() {
+    #[cfg(target_arch = "wasm32")]
     wasm_logger::init(wasm_logger::Config::default());
     launch(App);
 }
@@ -107,13 +110,12 @@ pub fn Line() -> Element {
         },
     ];
     use_effect(move || {
-        // canvas.set(get_canvas("line-canvas"));
+        #[cfg(target_arch = "wasm32")]
         if let Some(el) = polyblade::get_canvas(&canvas_id) {
             let tri = triangle.clone();
 
-            #[cfg(target_arch = "wasm32")]
             spawn(async move {
-                let gpu = WGPUInstance::new(SurfaceTarget::Canvas(el)).await;
+                let gpu = WGPUInstance::new(Canvas(el)).await;
                 info!("wgpu_instance created");
                 let renderer = Renderer::new(&gpu, &tri);
                 renderer.render(&gpu);

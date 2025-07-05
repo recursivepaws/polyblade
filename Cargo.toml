@@ -14,13 +14,20 @@ strum_macros = "0.27"
 ultraviolet = { version = "0.9.2", features = ["bytemuck"] }
 bytemuck = { version = "1.23.0", features = ["derive"] }
 
+dioxus-ssr = { version = "0.7.0-alpha.2", optional = true }
+dioxus-isrg = { version = "0.7.0-alpha.2", optional = true }
+dioxus-liveview = { version = "0.7.0-alpha.2", optional = true }
+
 wgpu = { version = "25.0.2", features = ["webgpu"] }
+
 
 # Not for web
 
 # Only for web
-wasm-logger = { version = "0.2.0"}
 color = { version = "0.3"}
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-logger = { version = "0.2.0"}
 web-sys = { version = "0.3.77", features = [
     "CanvasRenderingContext2d",
     "Document",
@@ -31,11 +38,14 @@ web-sys = { version = "0.3.77", features = [
 
 [features]
 default = ["web"]
-web = ["dioxus/web" ]
+web = ["dioxus/web"]
 fullstack = ["dioxus/fullstack" ]
 # desktop = ["dioxus/desktop"]
 # mobile = ["dioxus/mobile"]
 # native = ["dioxus/native"]
+
+
+# [target.'cfg(feature = "my-feature")'.dependencies]
 
 [profile]
 
