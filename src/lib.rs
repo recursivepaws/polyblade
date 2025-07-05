@@ -1,4 +1,5 @@
 pub mod graphics;
+pub mod renderer;
 
 #[cfg(target_arch = "wasm32")]
 use web_sys::{
