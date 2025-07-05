@@ -1,5 +1,5 @@
 use cfg_if::cfg_if;
-use dioxus::prelude::*;
+use dioxus::{html::g::fill, prelude::*};
 use log::info;
 use polyblade::{
     graphics::{Vertex, WGPUInstance},
@@ -25,6 +25,7 @@ enum Route {
 const FAVICON: Asset = asset!("/assets/favicon.ico");
 const MAIN_CSS: Asset = asset!("/assets/main.css");
 const TAILWIND_CSS: Asset = asset!("/assets/tailwind.css");
+const ERRORBG: Asset = asset!("/assets/errorbg.svg");
 
 #[derive(Debug, Clone, EnumIter, PartialEq, Display)]
 enum Platonic {
@@ -131,11 +132,11 @@ pub fn SpinningCube() -> Element {
     rsx! {
         div { class: "canvas-div",
             canvas { id: "wgpu-canvas", width: 1000, height: 1000 }
-            canvas {
-                id: "backup-canvas",
-                background_color: "green",
-                width: 1000,
-                height: 1000,
+            img {
+                id: "error-background",
+                src: "{ERRORBG}",
+                object_fit: "contain",
+                background_color: "white",
             }
         }
     }
