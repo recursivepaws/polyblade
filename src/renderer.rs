@@ -1,11 +1,8 @@
-use dioxus::prelude::*;
-// use graphics::{Vertex, WGPUInstance};
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
 use wgpu::wgt::{CommandEncoderDescriptor, TextureViewDescriptor};
-use wgpu::PrimitiveTopology::TriangleList;
 use wgpu::{
     include_wgsl, BlendState, Buffer, BufferUsages, Color, ColorTargetState, ColorWrites,
-    FragmentState, LoadOp, Operations, PipelineLayoutDescriptor, PrimitiveState,
+    FragmentState, LoadOp, MultisampleState, Operations, PipelineLayoutDescriptor, PrimitiveState,
     RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor,
     StoreOp, VertexState,
 };
@@ -21,54 +18,47 @@ pub struct Renderer {
 
 impl Renderer {
     pub fn new(gpu: &WGPUInstance, model: &Triangle) -> Self {
-        let vertex_buffer = gpu.device.create_buffer_init(&BufferInitDescriptor {
+        let WGPUInstance { device, config, .. } = gpu;
+
+        let vertex_buffer = device.create_buffer_init(&BufferInitDescriptor {
             label: Some("Vertex Buff"),
             contents: bytemuck::cast_slice(&model),
             usage: BufferUsages::VERTEX,
         });
 
-        let shader = gpu
-            .device
-            .create_shader_module(include_wgsl!("shaders/shader.wgsl"));
+        let shader = device.create_shader_module(include_wgsl!("shaders/shader.wgsl"));
 
-        let layout = gpu
-            .device
-            .create_pipeline_layout(&PipelineLayoutDescriptor {
-                label: Some("Render Pipeline Layout"),
-                bind_group_layouts: &[],
-                push_constant_ranges: &[],
-            });
+        let layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
+            label: Some("Render Pipeline Layout"),
+            bind_group_layouts: &[],
+            push_constant_ranges: &[],
+        });
 
-        let pipeline = gpu
-            .device
-            .create_render_pipeline(&RenderPipelineDescriptor {
-                label: Some("Render Pipeline"),
-                layout: Some(&layout),
-                vertex: VertexState {
-                    module: &shader,
-                    entry_point: Some("vs_main"),
-                    buffers: &[Vertex::desc()],
-                    compilation_options: Default::default(),
-                },
-                fragment: Some(FragmentState {
-                    module: &shader,
-                    entry_point: Some("fs_main"),
-                    targets: &[Some(ColorTargetState {
-                        format: gpu.config.format,
-                        blend: Some(BlendState::REPLACE),
-                        write_mask: ColorWrites::ALL,
-                    })],
-                    compilation_options: Default::default(),
-                }),
-                primitive: PrimitiveState {
-                    topology: TriangleList,
-                    ..Default::default()
-                },
-                depth_stencil: None,
-                multisample: Default::default(),
-                multiview: None,
-                cache: None,
-            });
+        let pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
+            label: Some("Render Pipeline"),
+            layout: Some(&layout),
+            vertex: VertexState {
+                module: &shader,
+                entry_point: Some("vs_main"),
+                buffers: &[Vertex::desc()],
+                compilation_options: Default::default(),
+            },
+            fragment: Some(FragmentState {
+                module: &shader,
+                entry_point: Some("fs_main"),
+                targets: &[Some(ColorTargetState {
+                    format: config.format,
+                    blend: Some(BlendState::REPLACE),
+                    write_mask: ColorWrites::ALL,
+                })],
+                compilation_options: Default::default(),
+            }),
+            primitive: PrimitiveState::default(),
+            depth_stencil: None,
+            multisample: MultisampleState::default(),
+            multiview: None,
+            cache: None,
+        });
 
         Self {
             vertex_buffer,
@@ -77,15 +67,16 @@ impl Renderer {
     }
 
     pub fn render(&self, gpu: &WGPUInstance) {
-        let frame = gpu.surface.get_current_texture().unwrap();
+        let WGPUInstance {
+            surface, device, ..
+        } = gpu;
 
+        let frame = surface.get_current_texture().unwrap();
         let view = frame.texture.create_view(&TextureViewDescriptor::default());
 
-        let mut encoder = gpu
-            .device
-            .create_command_encoder(&CommandEncoderDescriptor {
-                label: Some("Command Encoder"),
-            });
+        let mut encoder = device.create_command_encoder(&CommandEncoderDescriptor {
+            label: Some("Command Encoder"),
+        });
 
         {
             let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
