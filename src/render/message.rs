@@ -1,5 +1,6 @@
 use crate::{
-    bones::{PolyGraph, Transaction},
+    // bones::{PolyGraph, Transaction},
+    polyhedron::{Polyhedron, Transaction},
     render::camera::Camera,
     Instant,
 };
@@ -75,6 +76,7 @@ pub enum ConwayMessage {
     Ambo,
     // 3
     Kis,
+    Chamfer,
     // Needle,
     // Zip,
     Truncate,
@@ -152,15 +154,14 @@ pub trait ProcessMessage<T> {
 
 impl ProcessMessage<ModelState> for PresetMessage {
     fn process(&self, state: &mut ModelState) -> Task<PolybladeMessage> {
-        use PresetMessage::*;
-        match &self {
+        /* match &self {
             Prism(n) => {
-                state.polyhedron = PolyGraph::prism(*n);
+                state.polyhedron = Polyhedron::preset(&Prism(*n));
                 if n == &4 {
                     state.polyhedron.name = "C".into();
                 }
             }
-            AntiPrism(n) => state.polyhedron = PolyGraph::anti_prism(*n),
+            AntiPrism(n) => state.polyhedron = Polyhedron::preset(&AntiPrism(*n)),
             Pyramid(n) => {
                 state.polyhedron = PolyGraph::pyramid(*n);
                 if n == &3 {
@@ -170,7 +171,9 @@ impl ProcessMessage<ModelState> for PresetMessage {
             Octahedron => state.polyhedron = PolyGraph::octahedron(),
             Dodecahedron => state.polyhedron = PolyGraph::dodecahedron(),
             Icosahedron => state.polyhedron = PolyGraph::icosahedron(),
-        }
+        } */
+
+        state.polyhedron = Polyhedron::preset(self);
 
         Task::none()
     }

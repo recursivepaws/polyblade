@@ -186,7 +186,10 @@ impl App<'_> {
         {
             let primitive =
                 PolyhedronPrimitive::new(program_state.model.clone(), program_state.render.clone());
-            let moments = primitive.moment_vertices();
+            let moments = primitive
+                .model
+                .polyhedron
+                .moment_vertices(&program_state.render.picker.palette.colors);
 
             // Write barycentric and side data if a change in structure occurred
             if scene.moment_buf.len() != moments.len() {
@@ -194,7 +197,7 @@ impl App<'_> {
                     .moment_buf
                     .resize(&self.graphics.device, moments.len());
 
-                let shapes = primitive.shape_vertices();
+                let shapes = primitive.model.polyhedron.shape_vertices();
                 scene.shape_buf.resize(&self.graphics.device, shapes.len());
                 scene.shape_buf.write_slice(&self.graphics.queue, &shapes);
             }
@@ -244,11 +247,7 @@ impl App<'_> {
             // Ignore the whole first polygon if we're in schlegel mode
             let starting_vertex = if program.state.render.schlegel {
                 // Determines how many vertices are actually used to render the polygon
-                match program.state.model.polyhedron.cycles[0].len() {
-                    3 => 3,
-                    4 => 6,
-                    n => n * 3,
-                }
+                program.state.model.polyhedron.starting_vertex()
             } else {
                 0
             } as u32;

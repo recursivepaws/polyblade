@@ -18,7 +18,7 @@ impl PolyhedronPrimitive {
         Self { model, render }
     }
 
-    #[allow(dead_code)]
+    /* #[allow(dead_code)]
     pub fn surface_area(&self, face_index: usize) -> f32 {
         let positions: Vec<Vec3> = self.model.polyhedron.cycles[face_index]
             .iter()
@@ -34,10 +34,10 @@ impl PolyhedronPrimitive {
             area += (s * (s - a) * (s - b) * (s - c)).sqrt();
         }
         area
-    }
+    } */
 
-    /// All the vertices that will change moment to moment
-    pub fn moment_vertices(&self) -> Vec<MomentVertex> {
+    // All the vertices that will change moment to moment
+    /*     pub fn moment_vertices(&self) -> Vec<MomentVertex> {
         let polyhedron = &self.model.polyhedron;
         let colors = &self.render.picker.palette.colors;
 
@@ -96,9 +96,9 @@ impl PolyhedronPrimitive {
             }
             ColorMethodMessage::Face => todo!(),
         }
-    }
+    } */
 
-    pub fn shape_vertices(&self) -> Vec<ShapeVertex> {
+    /* pub fn shape_vertices(&self) -> Vec<ShapeVertex> {
         let barycentric = [Vec3::unit_x(), Vec3::unit_y(), Vec3::unit_z()];
         self.model
             .polyhedron
@@ -133,5 +133,5 @@ impl PolyhedronPrimitive {
             })
             .collect::<Vec<Vec<ShapeVertex>>>()
             .concat()
-    }
+    } */
 }

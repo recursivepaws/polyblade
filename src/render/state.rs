@@ -1,5 +1,5 @@
 use crate::{
-    bones::PolyGraph,
+    polyhedron::Polyhedron,
     render::{
         camera::Camera,
         message::ColorMethodMessage,
@@ -76,14 +76,14 @@ impl Default for ColorPickerState {
 
 #[derive(Debug, Clone)]
 pub struct ModelState {
-    pub polyhedron: PolyGraph,
+    pub polyhedron: Polyhedron,
     pub transform: Mat4,
 }
 
 impl Default for ModelState {
     fn default() -> Self {
         Self {
-            polyhedron: PolyGraph::dodecahedron(),
+            polyhedron: Polyhedron::default(),
             transform: Mat4::identity(),
         }
     }
@@ -99,7 +99,7 @@ pub fn load_polydex() -> Result<Polydex, Box<dyn std::error::Error>> {
 
 impl Default for AppState {
     fn default() -> Self {
-        let info = PolyGraph::default().polydex_entry(&vec![]);
+        let info = Polyhedron::default().polydex_entry(&vec![]);
         Self {
             model: ModelState::default(),
             render: RenderState::default(),

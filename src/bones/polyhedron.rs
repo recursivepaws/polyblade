@@ -106,6 +106,7 @@ impl PolyGraph {
                     use ConwayMessage::*;
                     use Transaction::*;
                     let new_transactions = match conway {
+                        Chamfer => todo!(),
                         Dual => {
                             let edges = self.expand(false);
                             vec![
