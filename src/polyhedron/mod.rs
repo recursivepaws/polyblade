@@ -117,7 +117,7 @@ impl Polyhedron {
                         Ambo => {
                             // let edges = self.shape.ambo();
                             // self.shape.recompute();
-                            let edges = self.ambo();
+                            let (edges, _) = self.ambo();
                             vec![Contraction(edges), Name('a')]
                         }
                         Chamfer => {
@@ -147,8 +147,9 @@ impl Polyhedron {
                             vec![Name('t')]
                         }
                         Expand => {
-                            self.expand();
-                            vec![Name('e')]
+                            let edges = self.expand();
+                            // vec![Name('e')]
+                            vec![Name('d')]
                         }
                         Snub => {
                             // self.graph.expand(true);

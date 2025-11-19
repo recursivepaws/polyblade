@@ -16,10 +16,8 @@ pub(in super::super) struct Cycles {
 }
 
 impl Cycles {
-    pub fn new(cycles: Vec<Vec<VertexId>>) -> Self {
-        Self {
-            cycles: cycles.into_iter().map(Cycle).collect(),
-        }
+    pub fn new(cycles: Vec<Cycle>) -> Self {
+        Self { cycles }
     }
 
     #[allow(dead_code)]
@@ -183,7 +181,24 @@ impl From<&Distance> for Cycles {
             }
         }
 
-        let mut cycles = cycles.into_iter().collect::<Vec<_>>();
+        let mut cycles = cycles.into_iter().map(Cycle).collect::<Vec<_>>();
+
+        let mut reference_edges = vec![];
+        for ci in 0..cycles.len() {
+            for [v, u] in cycles[ci].edges() {
+                if reference_edges.contains(&[v, u]) {
+                    cycles[ci].reverse();
+                    break;
+                }
+            }
+
+            for edge in cycles[ci].edges() {
+                if !reference_edges.contains(&edge) {
+                    reference_edges.push(edge);
+                }
+            }
+        }
+
         cycles.sort_by_key(|c| usize::MAX - c.len());
         Cycles::new(cycles)
     }

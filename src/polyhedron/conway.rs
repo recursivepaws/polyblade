@@ -21,14 +21,13 @@ impl Polyhedron {
 
     /// `a` ambo
     /// Returns a set of edges to contract
-    pub fn ambo(&mut self) -> Vec<[VertexId; 2]> {
+    pub fn ambo(&mut self) -> (Vec<[VertexId; 2]>, Vec<[VertexId; 2]>) {
         // Truncate
         let new_edges = self.truncate(0);
         // Edges that were already there get contracted
         self.shape
             .edges()
-            .filter(|&[v, u]| !new_edges.contains(&[v, u]) && !new_edges.contains(&[u, v]))
-            .collect()
+            .partition(|&[v, u]| !new_edges.contains(&[v, u]) && !new_edges.contains(&[u, v]))
     }
 
     pub fn contract(&mut self, edges: Vec<[VertexId; 2]>) {
@@ -37,7 +36,7 @@ impl Polyhedron {
     }
 
     pub fn ambo_contract(&mut self) {
-        let edges = self.ambo();
+        let (edges, _) = self.ambo();
         self.contract(edges);
         log::info!(
             "p: {}, d: {}",
@@ -49,8 +48,12 @@ impl Polyhedron {
     pub fn expand(&mut self) -> Vec<[VertexId; 2]> {
         println!("before expand");
         println!("{}", self.shape);
+        self.shape.expand();
+        // self.ambo_contract();
+        // let (edges, new_edges) = self.ambo();
+        // self.contract(edges);
 
-        let new_edges = self.shape.expand();
+        // let new_edges = self.shape.expand();
 
         println!("after expand");
         println!("{}", self.shape);

@@ -91,12 +91,20 @@ impl Cycle {
         return false;
     }
 
+    pub fn edges(&self) -> Vec<[VertexId; 2]> {
+        return (0..self.len()).map(|i| [self[i], self[i + 1]]).collect();
+    }
+
     pub fn neighbors(&self, v: &VertexId) -> Option<[VertexId; 2]> {
         if let Some(ui) = self.iter().position(|x| x == v) {
             Some([self[ui + self.len() - 1], self[ui + 1]])
         } else {
             None
         }
+    }
+
+    pub fn reverse(&mut self) {
+        self.0.reverse();
     }
 
     #[allow(dead_code)]

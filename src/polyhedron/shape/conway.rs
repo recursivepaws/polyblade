@@ -22,6 +22,19 @@ impl Shape {
         self.recompute();
     }
 
+    /* pub fn ofi(&self) {
+        let ordered_face_indices: std::collections::HashMap<usize, Vec<usize>> = self
+            .distance
+            .vertices()
+            .map(|v| (v, self.ordered_vertices(v)))
+            .collect();
+
+        log::info!(
+            "incident vertices arranged in cyclic order: {:?}",
+            ordered_face_indices
+        );
+    } */
+
     /* pub fn expand(&mut self) {
 
         self.distance.exp
@@ -188,7 +201,7 @@ impl Shape {
         self.recompute();
     }
 
-    pub fn _expand(&mut self, snub: bool) -> Vec<[VertexId; 2]> {
+    /* pub fn _expand(&mut self, snub: bool) -> Vec<[VertexId; 2]> {
         // Helper to normalize edges (smaller vertex first)
         // let mut new_edges = HashSet::<[VertexId; 2]>::default();
         let mut new_edges = Distance::new_max(self.distance.order() * 10);
@@ -197,7 +210,7 @@ impl Shape {
         let ordered_face_indices: HashMap<usize, Vec<usize>> = self
             .distance
             .vertices()
-            .map(|v| (v, self.ordered_face_indices(v)))
+            .map(|v| (v, self.ordered_vertices(v)))
             .collect();
 
         println!("ordered face indices:\n {:#?}", ordered_face_indices);
@@ -297,16 +310,22 @@ impl Shape {
         self.recompute();
 
         new_edges.edges().collect()
-    }
+    } */
 
-    pub fn expand(&mut self) -> Vec<[VertexId; 2]> {
+    /* pub fn __expand(&mut self) -> Vec<[VertexId; 2]> {
         let ordered_face_indices: HashMap<usize, Vec<usize>> = self
             .distance
             .vertices()
-            .map(|v| (v, self.ordered_face_indices(v)))
+            .map(|v| (v, self.ordered_vertices(v)))
             .collect();
 
-        let mut count = 0;
+        println!("distance: {}", self.distance);
+        log::info!(
+            "incident vertices arranged in cyclic order: {:?}",
+            ordered_face_indices
+        );
+
+        /* let mut count = 0;
         for v in self.distance.vertices() {
             // let existing = ordered_face_indices[&v].clone();
             //
@@ -346,8 +365,175 @@ impl Shape {
             }
         }
 
+        self.recompute(); */
+
+        return vec![];
+    } */
+
+    pub fn expand2(&mut self) -> Vec<[VertexId; 2]> {
+        let incident_vertices: HashMap<usize, Vec<VertexId>> = self
+            .distance
+            .vertices()
+            .map(|v| (v, self.cycles.sorted_connections(v)))
+            .collect();
+
+        let incident_edges: HashMap<usize, Vec<[VertexId; 2]>> = self
+            .distance
+            .vertices()
+            .map(|v| (v, self.incident_edges(v)))
+            .collect();
+
+        for edge in incident_edges {}
+
         self.recompute();
 
         return vec![];
+    }
+
+    pub fn expand_222(&mut self) {
+        use std::collections::HashMap;
+
+        let original_vertex_count = self.distance.order();
+        let original_edges: Vec<[VertexId; 2]> = self.distance.edges().collect();
+
+        // Cache incident edges for all vertices before modifying the graph
+        let mut all_incident_edges: Vec<Vec<[VertexId; 2]>> = Vec::new();
+        for v in 0..original_vertex_count {
+            all_incident_edges.push(self.incident_edges(v));
+        }
+
+        // Step 3: Remove all original edges
+        for &edge in &original_edges {
+            self.distance.disconnect(edge);
+        }
+
+        // Map each (vertex, neighbor) pair to a vertex ID in the expanded graph
+        let mut edge_vertex_map: HashMap<(VertexId, VertexId), VertexId> = HashMap::new();
+
+        // Step 1: Create vertex polygons
+        // Each vertex v of degree d becomes a d-gon using v plus (d-1) new vertices
+        for v in 0..original_vertex_count {
+            let incident = &all_incident_edges[v];
+
+            // First incident edge uses the original vertex
+            let first_neighbor = incident[0][1];
+            edge_vertex_map.insert((v, first_neighbor), v);
+
+            // Remaining incident edges get new vertices
+            for i in 1..incident.len() {
+                let neighbor = incident[i][1];
+                let new_v = self.distance.insert();
+                edge_vertex_map.insert((v, neighbor), new_v);
+            }
+
+            // Connect the vertices around this polygon
+            for i in 0..incident.len() {
+                let curr_neighbor = incident[i][1];
+                let next_neighbor = incident[(i + 1) % incident.len()][1];
+
+                let curr_vertex = edge_vertex_map[&(v, curr_neighbor)];
+                let next_vertex = edge_vertex_map[&(v, next_neighbor)];
+
+                self.distance.connect([curr_vertex, next_vertex]);
+            }
+        }
+
+        // Step 2: Add cross-connections for each original edge to form squares
+        for &[v, u] in &original_edges {
+            let incident_v = &all_incident_edges[v];
+            let incident_u = &all_incident_edges[u];
+
+            // Find where this edge appears in each vertex's incident list
+            let curr_idx_v = incident_v.iter().position(|e| e[1] == u).unwrap();
+            let next_idx_v = (curr_idx_v + 1) % incident_v.len();
+
+            let curr_idx_u = incident_u.iter().position(|e| e[1] == v).unwrap();
+            let next_idx_u = (curr_idx_u + 1) % incident_u.len();
+
+            // Get the relevant vertices from each polygon
+            let curr_v = edge_vertex_map[&(v, incident_v[curr_idx_v][1])];
+            let next_v = edge_vertex_map[&(v, incident_v[next_idx_v][1])];
+
+            let curr_u = edge_vertex_map[&(u, incident_u[curr_idx_u][1])];
+            let next_u = edge_vertex_map[&(u, incident_u[next_idx_u][1])];
+
+            // Add two cross-connections to complete the square
+            self.distance.connect([next_v, curr_u]);
+            self.distance.connect([next_u, curr_v]);
+        }
+
+        self.recompute();
+    }
+    pub fn expand(&mut self) {
+        use std::collections::HashMap;
+        log::info!("cycles: {:?}", self.cycles);
+
+        let original_vertex_count = self.distance.order();
+        let original_edges: Vec<[VertexId; 2]> = self.distance.edges().collect();
+
+        // Cache incident edges for all vertices before modifying the graph
+        let mut all_incident_edges: Vec<Vec<[VertexId; 2]>> = Vec::new();
+        for v in 0..original_vertex_count {
+            all_incident_edges.push(self.incident_edges(v));
+        }
+
+        // Disconnect all original edges NOW (before creating new vertices)
+        for &edge in &original_edges {
+            self.distance.disconnect(edge);
+        }
+
+        // Map each (vertex, neighbor) pair to a vertex ID in the expanded graph
+        let mut edge_vertex_map: HashMap<(VertexId, VertexId), VertexId> = HashMap::new();
+
+        // Step 1: Create vertex polygons
+        for v in 0..original_vertex_count {
+            let incident = &all_incident_edges[v];
+
+            // First incident edge uses the original vertex
+            let first_neighbor = incident[0][1];
+            edge_vertex_map.insert((v, first_neighbor), v);
+
+            // Remaining incident edges get new vertices
+            for i in 1..incident.len() {
+                let neighbor = incident[i][1];
+                let new_v = self.distance.insert();
+                edge_vertex_map.insert((v, neighbor), new_v);
+            }
+
+            // Connect the vertices around this polygon
+            for i in 0..incident.len() {
+                let curr_neighbor = incident[i][1];
+                let next_neighbor = incident[(i + 1) % incident.len()][1];
+
+                let curr_vertex = edge_vertex_map[&(v, curr_neighbor)];
+                let next_vertex = edge_vertex_map[&(v, next_neighbor)];
+
+                self.distance.connect([curr_vertex, next_vertex]);
+            }
+        }
+
+        // Step 2: Add ALL cross-connections (this will re-add the needed original edges)
+        for &[v, u] in &original_edges {
+            let incident_v = &all_incident_edges[v];
+            let incident_u = &all_incident_edges[u];
+
+            let curr_idx_v = incident_v.iter().position(|e| e[1] == u).unwrap();
+            let next_idx_v = (curr_idx_v + 1) % incident_v.len();
+
+            let curr_idx_u = incident_u.iter().position(|e| e[1] == v).unwrap();
+            let next_idx_u = (curr_idx_u + 1) % incident_u.len();
+
+            let curr_v = edge_vertex_map[&(v, incident_v[curr_idx_v][1])];
+            let next_v = edge_vertex_map[&(v, incident_v[next_idx_v][1])];
+
+            let curr_u = edge_vertex_map[&(u, incident_u[curr_idx_u][1])];
+            let next_u = edge_vertex_map[&(u, incident_u[next_idx_u][1])];
+
+            // Add both cross-connections (one will re-add the original edge)
+            self.distance.connect([next_v, curr_u]);
+            self.distance.connect([next_u, curr_v]);
+        }
+
+        self.recompute();
     }
 }
