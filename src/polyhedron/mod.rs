@@ -27,6 +27,14 @@ use ultraviolet::{Vec3, Vec4};
 
 pub type VertexId = usize;
 
+pub fn normalize_edge(edge: [VertexId; 2]) -> [VertexId; 2] {
+    if edge[0] < edge[1] {
+        edge
+    } else {
+        [edge[1], edge[0]]
+    }
+}
+
 pub const SPEED_DAMPENING: f32 = 0.92;
 
 #[derive(Debug, Clone)]
@@ -94,7 +102,8 @@ impl Polyhedron {
                             //     Contraction(edges),
                             //     Name('d'),
                             // ]
-                            todo!()
+                            self.dual();
+                            vec![Name('d')]
                         }
                         Join => {
                             // let edges = self.graph.kis(Option::None);
@@ -138,10 +147,8 @@ impl Polyhedron {
                             vec![Name('t')]
                         }
                         Expand => {
-                            self.ambo_contract();
-                            let edges = self.ambo();
-                            // self.shape.expand(false);
-                            vec![Contraction(edges), Name('e')]
+                            self.expand();
+                            vec![Name('e')]
                         }
                         Snub => {
                             // self.graph.expand(true);

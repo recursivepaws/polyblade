@@ -37,6 +37,13 @@ impl Distance {
                 .collect(),
         }
     }
+
+    pub fn new_max(n: usize) -> Self {
+        Distance {
+            order: n,
+            distance: (0..n).flat_map(|m| vec![usize::MAX; m + 1]).collect(),
+        }
+    }
 }
 
 impl Distance {
@@ -45,6 +52,10 @@ impl Distance {
         if self[[v, u]] != 0 {
             self[[v, u]] = 1;
         }
+    }
+
+    pub fn connected(&mut self, [v, u]: [VertexId; 2]) -> bool {
+        self[[v, u]] == 1
     }
 
     /// Disconnect one vertex from another iff they are neighbors
@@ -202,7 +213,8 @@ impl Display for Distance {
         for v in self.vertices() {
             f.write_fmt(format_args!("{v}:\t|"))?;
             for u in self.vertices() {
-                let value = if self[[v, u]] == usize::MAX {
+                // let value = if self[[v, u]] == usize::MAX {
+                let value = if self[[v, u]] > 1 {
                     String::from("_")
                 } else {
                     self[[v, u]].to_string()

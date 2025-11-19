@@ -35,6 +35,11 @@ impl Cycles {
     pub fn into_iter(self) -> std::vec::IntoIter<Cycle> {
         self.cycles.into_iter()
     }
+
+    pub fn push(&mut self, cycle: Cycle) {
+        self.cycles.push(cycle);
+    }
+
     /// Returns the
     pub fn sorted_connections(&self, v: VertexId) -> Vec<VertexId> {
         // We only care about cycles that contain the vertex
@@ -68,6 +73,7 @@ impl Cycles {
 
         sorted_connections[1..].to_vec()
     }
+
     pub fn shape_vertices(&self) -> Vec<ShapeVertex> {
         let barycentric = [Vec3::unit_x(), Vec3::unit_y(), Vec3::unit_z()];
         self.iter()

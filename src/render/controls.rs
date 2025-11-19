@@ -1,7 +1,7 @@
 use iced::{alignment::Vertical, Length};
 use iced_aw::{menu::Item, menu_bar};
 use iced_wgpu::Renderer;
-use iced_widget::{button, column, container, row, text, Row};
+use iced_widget::{button, column, container, row, text, Row, Space};
 use iced_winit::{
     core::{Color, Element, Theme},
     runtime::{Program, Task},
@@ -34,7 +34,7 @@ impl Program for Controls {
         message.process(&mut self.state)
     }
 
-    fn view(&self) -> Element<Self::Message, Self::Theme, Self::Renderer> {
+    fn view(&'_ self) -> Element<'_, Self::Message, Self::Theme, Self::Renderer> {
         let mut button_row = Row::new().spacing(10);
         for (i, color) in self
             .state
@@ -75,7 +75,9 @@ impl Program for Controls {
             column![
                 menu_bar.align_y(Vertical::Top),
                 button_row,
-                iced_widget::Space::new(Length::Fill, Length::Fill),
+                Space::new(Length::Fill, Length::Fill),
+                self.state.model.polyhedron.svg(),
+                Space::new(Length::Fill, Length::Fill),
                 button(text(self.state.info.name())).on_press(self.state.info.wiki_message()),
                 container(
                     row![

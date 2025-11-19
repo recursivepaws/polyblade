@@ -36,15 +36,15 @@ impl Polyhedron {
         polyhedron
     }
 
-    pub fn dodecahedron() -> Polyhedron {
-        let mut graph = Polyhedron::preset(&AntiPrism(5));
-        graph.shape.kis(Some(5));
+    fn dodecahedron() -> Polyhedron {
+        let mut graph = Polyhedron::octahedron();
+        graph.dual();
         graph.render.new_capacity(graph.shape.order());
         graph.name = "D".to_string();
         graph
     }
 
-    pub fn icosahedron() -> Polyhedron {
+    fn icosahedron() -> Polyhedron {
         let mut graph = Polyhedron::preset(&AntiPrism(5));
         graph.shape.kis(Some(5));
         graph.render.new_capacity(graph.shape.order());
@@ -55,6 +55,6 @@ impl Polyhedron {
 
 impl Default for Polyhedron {
     fn default() -> Self {
-        Self::dodecahedron()
+        Self::preset(&Prism(4))
     }
 }

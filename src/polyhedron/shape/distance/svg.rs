@@ -1,11 +1,15 @@
 use super::Distance;
-use graphviz_rust::{cmd::Format, exec, parse, printer::PrinterContext};
+use graphviz_rust::{
+    cmd::Format,
+    exec, parse,
+    printer::{DotPrinter, PrinterContext},
+};
 
 const LAYOUT_PREFIX: &str = r#"
     graph G {
         node [
-            penwidth=2 
-            label="" 
+            penwidth=2
+            label=""
             style=filled
             fillcolor=lightblue
             color=black
@@ -35,15 +39,17 @@ impl Distance {
         }
 
         layout.push('}');
-        // println!("graphviz:\n{layout}");
+        log::info!("graphviz:\n{layout}");
         layout
     }
 
     pub fn svg(&self) -> Option<Vec<u8>> {
         let Ok(graph) = parse(&self.graphviz()) else {
-            log::warn!("failed to parse Graphviz");
+            log::error!("failed to parse Graphviz");
             return None;
         };
+
+        // graph.print(&mut PrinterContext::default());
         exec(
             graph,
             &mut PrinterContext::default(),

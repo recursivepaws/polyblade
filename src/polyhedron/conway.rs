@@ -46,6 +46,33 @@ impl Polyhedron {
         );
     }
 
+    pub fn expand(&mut self) -> Vec<[VertexId; 2]> {
+        println!("before expand");
+        println!("{}", self.shape);
+
+        let new_edges = self.shape.expand();
+
+        println!("after expand");
+        println!("{}", self.shape);
+
+        log::info!(
+            "p: {}, d: {}",
+            self.render.positions.len(),
+            self.shape.order()
+        );
+
+        return vec![];
+    }
+
+    pub fn dual(&mut self) {
+        self.shape.dual();
+        log::info!(
+            "p: {}, d: {}",
+            self.render.positions.len(),
+            self.shape.order()
+        );
+    }
+
     pub fn chamfer(&mut self) {
         self.shape.chamfer();
     }

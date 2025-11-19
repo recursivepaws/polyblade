@@ -45,31 +45,58 @@ impl Cycle {
             .collect::<Vec<_>>();
     }
 
-    #[allow(dead_code)]
     pub fn replace(&mut self, old: VertexId, new: VertexId) {
-        self.0 = self
-            .0
-            .clone()
-            .into_iter()
-            .filter_map(|v| {
-                if v == new {
-                    None
-                } else if v == old {
-                    Some(new)
-                } else {
-                    Some(v)
-                }
-            })
-            .collect();
+        if self.0.contains(&new) && self.0.contains(&old) {
+            self.0
+                .remove(self.0.iter().position(|&x| x == old).unwrap());
+        } else {
+            self.0 = self
+                .0
+                .clone()
+                .into_iter()
+                .map(|x| if x == old { new } else { x })
+                .collect();
+        }
+        // self.0 = self
+        //     .0
+        //     .clone()
+        //     .into_iter()
+        //     .filter_map(|v| {
+        //         if v == new {
+        //             None
+        //         } else if v == old {
+        //             Some(new)
+        //         } else {
+        //             Some(v)
+        //         }
+        //     })
+        //     .collect();
     }
 
     pub fn iter(&self) -> std::slice::Iter<'_, usize> {
         self.0.iter()
     }
 
-    #[allow(dead_code)]
     pub fn contains(&self, v: &VertexId) -> bool {
         self.0.contains(v)
+    }
+
+    pub fn contains_edge(&self, edge: [VertexId; 2]) -> bool {
+        let [a, b] = edge;
+        if let Some(vn) = self.neighbors(&a) {
+            if let Some(un) = self.neighbors(&b) {
+                return vn.to_vec().contains(&b) && un.to_vec().contains(&a);
+            }
+        }
+        return false;
+    }
+
+    pub fn neighbors(&self, v: &VertexId) -> Option<[VertexId; 2]> {
+        if let Some(ui) = self.iter().position(|x| x == v) {
+            Some([self[ui + self.len() - 1], self[ui + 1]])
+        } else {
+            None
+        }
     }
 
     #[allow(dead_code)]
