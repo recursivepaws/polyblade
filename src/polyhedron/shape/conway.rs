@@ -6,10 +6,41 @@ use std::collections::{HashMap, HashSet};
 
 impl Shape {
     pub fn split_vertex(&mut self, v: VertexId) -> Vec<[usize; 2]> {
-        let sc = self.cycles.sorted_connections(v);
-        let edges = self.distance.split_vertex(v, sc);
+        let connections = self.cycles.sorted_connections(v);
+        log::info!("sorted connections for {v}: {connections:?}");
+        // let edges = self.distance.split_vertex(v, sc.clone());
+
+        // Remove the vertex
+        let new_cycle: Cycle = Cycle::from(
+            vec![v]
+                .into_iter()
+                .chain((1..connections.len()).map(|_| self.insert(Some(v))))
+                .collect(),
+        );
+
+        for c in &connections {
+            self.distance.disconnect([v, *c]);
+        }
+
+        for i in 0..new_cycle.len() {
+            self.distance.connect([new_cycle[i], connections[i]]);
+        }
+
+        // track the edges that will compose the new face
+        let mut new_edges = vec![];
+        for i in 0..new_cycle.len() {
+            let edge = [new_cycle[i], new_cycle[i + 1]];
+            self.distance.connect(edge);
+            new_edges.push(edge);
+        }
+
+        // new_edges
+        //
+        // for connection in sc {
+        //     self.set_position(v, connection);
+        // }
         self.cycles = Cycles::from(&self.distance);
-        edges
+        new_edges
     }
 
     pub fn contract_edges(&mut self, edges: Vec<[VertexId; 2]>) {
@@ -229,7 +260,7 @@ impl Shape {
             // Remaining incident edges get new vertices
             for i in 1..incident.len() {
                 let neighbor = incident[i][1];
-                let new_v = self.distance.insert();
+                let new_v = self.insert(Some(neighbor));
                 edge_vertex_map.insert((v, neighbor), new_v);
             }
 
@@ -245,26 +276,47 @@ impl Shape {
             }
         }
 
+        // Step 2: Add cross-connections
+        // for &[v, u] in &original_edges {
+        //     let incident_v = &all_incident_edges[v];
+        //     let incident_u = &all_incident_edges[u];
+        //
+        //     let curr_idx_v = incident_v.iter().position(|e| e[1] == u).unwrap();
+        //     let next_idx_v = (curr_idx_v + 1) % incident_v.len();
+        //
+        //     let curr_idx_u = incident_u.iter().position(|e| e[1] == v).unwrap();
+        //     let next_idx_u = (curr_idx_u + 1) % incident_u.len();
+        //
+        //     let curr_v = edge_vertex_map[&(v, incident_v[curr_idx_v][1])];
+        //     let next_v = edge_vertex_map[&(v, incident_v[next_idx_v][1])];
+        //
+        //     let curr_u = edge_vertex_map[&(u, incident_u[curr_idx_u][1])];
+        //     let next_u = edge_vertex_map[&(u, incident_u[next_idx_u][1])];
+        //
+        //     // Add both cross-connections (one will re-add the original edge)
+        //     self.distance.connect([next_v, curr_u]);
+        //     self.distance.connect([next_u, curr_v]);
+        // }
         // Step 2: Add ALL cross-connections (this will re-add the needed original edges)
         for &[v, u] in &original_edges {
             let incident_v = &all_incident_edges[v];
             let incident_u = &all_incident_edges[u];
 
             let curr_idx_v = incident_v.iter().position(|e| e[1] == u).unwrap();
-            let next_idx_v = (curr_idx_v + 1) % incident_v.len();
+            let prev_idx_v = (curr_idx_v + incident_v.len() - 1) % incident_v.len(); // PREVIOUS, not next
 
             let curr_idx_u = incident_u.iter().position(|e| e[1] == v).unwrap();
-            let next_idx_u = (curr_idx_u + 1) % incident_u.len();
+            let prev_idx_u = (curr_idx_u + incident_u.len() - 1) % incident_u.len(); // PREVIOUS, not next
 
             let curr_v = edge_vertex_map[&(v, incident_v[curr_idx_v][1])];
-            let next_v = edge_vertex_map[&(v, incident_v[next_idx_v][1])];
+            let prev_v = edge_vertex_map[&(v, incident_v[prev_idx_v][1])]; // prev instead of next
 
             let curr_u = edge_vertex_map[&(u, incident_u[curr_idx_u][1])];
-            let next_u = edge_vertex_map[&(u, incident_u[next_idx_u][1])];
+            let prev_u = edge_vertex_map[&(u, incident_u[prev_idx_u][1])]; // prev instead of next
 
-            // Add both cross-connections (one will re-add the original edge)
-            self.distance.connect([next_v, curr_u]);
-            self.distance.connect([next_u, curr_v]);
+            // The square is: curr_v → curr_u → prev_u → prev_v → curr_v
+            self.distance.connect([prev_v, curr_u]);
+            self.distance.connect([curr_v, prev_u]);
         }
 
         self.recompute();

@@ -1,10 +1,12 @@
+use ultraviolet::Vec3;
+
 use crate::polyhedron::{Polyhedron, VertexId};
 
 impl Polyhedron {
     pub fn split_vertex(&mut self, v: usize) -> Vec<[usize; 2]> {
         let Polyhedron { shape, render, .. } = self;
         let edges = shape.split_vertex(v);
-        render.extend(edges.len() - 1, render.positions[v]);
+        // render.extend(edges.len() - 1, render.positions[v]);
         edges
     }
 

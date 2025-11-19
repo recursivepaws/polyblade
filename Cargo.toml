@@ -1,6 +1,6 @@
 [package]
 name = "polyblade"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Vera Gonzalez <me@vera.lgbt>"]
 edition = "2021"
 license-file = "LICENSE"
@@ -39,8 +39,10 @@ webbrowser = { version = "1.0.2" }
 iced_winit = { version = "0.13" }
 iced_widget = { version = "0.13", features = ["wgpu"] }
 iced_wgpu = { version = "0.13", features = ["webgl"] }
-log = "0.4.22"
-rustc-hash = "2.0.0"
+log = { version = "0.4.22" }
+rustc-hash = { version = "2.0.0" }
+graphviz-rust = { version = "0.9.3" }
+crossbeam-channel = "0.5.15"
 
 [dev-dependencies]
 test-case = { version = "^3.3.0" }
@@ -65,3 +67,7 @@ console_log = { version = "1.0" }
 
 [profile.release]
 debug = true
+
+[features]
+default = []
+#graphs = ["dep:layout-rs"]

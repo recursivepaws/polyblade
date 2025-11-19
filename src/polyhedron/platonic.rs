@@ -1,22 +1,27 @@
 use super::*;
+use crossbeam_channel::unbounded;
 use PresetMessage::*;
 
 impl Polyhedron {
     pub fn preset(preset: &PresetMessage) -> Polyhedron {
         use PresetMessage::*;
+        let (s, r) = unbounded();
         let mut poly = match preset {
             Octahedron => Self::octahedron(),
             Dodecahedron => Self::dodecahedron(),
             Icosahedron => Self::icosahedron(),
             _ => {
-                let shape = match preset {
+                let mut shape = match preset {
                     Prism(n) => Shape::prism(*n),
                     AntiPrism(n) => Shape::anti_prism(*n),
                     Pyramid(n) => Shape::pyramid(*n),
                     _ => todo!(),
                 };
 
-                let render = Render::new(shape.order());
+                let mut render = Render::new(shape.order());
+
+                shape.set_sender(s);
+                render.set_receiver(r);
 
                 Polyhedron {
                     name: preset.to_string(),
@@ -37,8 +42,8 @@ impl Polyhedron {
     }
 
     fn dodecahedron() -> Polyhedron {
-        let mut graph = Polyhedron::octahedron();
-        graph.dual();
+        let mut graph = Polyhedron::preset(&AntiPrism(5));
+        graph.expand();
         graph.render.new_capacity(graph.shape.order());
         graph.name = "D".to_string();
         graph

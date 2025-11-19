@@ -1,3 +1,4 @@
+use crossbeam_channel::{unbounded, Receiver};
 use rand::random;
 use ultraviolet::{Lerp as _, Vec3};
 
@@ -11,6 +12,7 @@ pub struct Render {
     pub speeds: Vec<Vec3>,
     /// Edge length
     pub edge_length: f32,
+    pub receiver: Option<Receiver<[VertexId; 2]>>,
 }
 
 //impl rand::
@@ -26,7 +28,12 @@ impl Render {
             positions: random_positions(n),
             speeds: vec![Vec3::zero(); n],
             edge_length: 1.0,
+            receiver: None,
         }
+    }
+
+    pub fn set_receiver(&mut self, receiver: Receiver<[VertexId; 2]>) {
+        self.receiver = Some(receiver);
     }
 
     pub fn update(&mut self, speed: f32, second: f32) {
@@ -53,8 +60,27 @@ impl Render {
     pub fn new_capacity(&mut self, n: usize) {
         if n > self.positions.len() {
             let difference = n - self.positions.len();
-            self.positions.extend(random_positions(difference));
+            self.positions.extend(vec![Vec3::zero(); difference]);
             self.speeds.extend(vec![Vec3::zero(); difference]);
+        }
+    }
+
+    pub fn receive_position_updates(&mut self) {
+        if let Some(receiver) = &self.receiver {
+            while !receiver.is_empty() {
+                match receiver.recv() {
+                    Ok([next_to, new_id]) => {
+                        log::info!("received position update to make {new_id} copy {next_to}");
+                        if self.positions.len() - 1 < new_id {
+                            self.positions.push(Vec3::zero());
+                            self.speeds.push(Vec3::zero());
+                        }
+                        self.positions[new_id] = self.positions[next_to];
+                        self.speeds[new_id] = Vec3::zero();
+                    }
+                    Err(e) => log::error!("error: {e}"),
+                }
+            }
         }
     }
 

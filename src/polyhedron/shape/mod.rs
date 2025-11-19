@@ -4,6 +4,7 @@ mod distance;
 mod platonic;
 use std::{fmt::Display, fs::File, io::Write, ops::Range};
 
+use crossbeam_channel::Sender;
 use cycles::*;
 use distance::*;
 
@@ -23,6 +24,8 @@ pub(super) struct Shape {
     pub springs: Vec<[VertexId; 2]>,
     /// SVG string of graph representation
     pub svg: Vec<u8>,
+
+    sender: Option<Sender<[VertexId; 2]>>,
 }
 
 impl PartialEq for Shape {
@@ -44,6 +47,26 @@ impl Display for Shape {
 }
 
 impl Shape {
+    pub fn set_sender(&mut self, sender: Sender<[VertexId; 2]>) {
+        self.sender = Some(sender);
+    }
+
+    pub fn set_position(&mut self, existing: VertexId, new: VertexId) {
+        if let Some(sender) = &self.sender {
+            sender.send([existing, new]).unwrap();
+        }
+    }
+
+    pub fn insert(&mut self, next_to: Option<VertexId>) -> VertexId {
+        let new_id = self.distance.insert();
+        if let Some(sender) = &self.sender {
+            if let Some(next_to) = next_to {
+                sender.send([next_to, new_id]).unwrap();
+            }
+        }
+        return new_id;
+    }
+
     pub fn order(&self) -> usize {
         self.distance.order()
     }
