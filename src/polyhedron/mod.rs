@@ -87,13 +87,14 @@ impl Polyhedron {
                     use Transaction::*;
                     let new_transactions = match conway {
                         Dual => {
-                            // let edges = self.expand(false);
-                            // vec![
-                            //     Wait(Instant::now() + Duration::from_millis((65.0 * speed) as u64)),
-                            //     Contraction(edges),
-                            //     Name('d'),
-                            // ]
-                            todo!()
+                            let edges = self.expand(false).iter().collect();
+                            let speed = 0.5;
+                            vec![
+                                Wait(Instant::now() + Duration::from_millis((65.0 * speed) as u64)),
+                                Contraction(edges),
+                                Name('d'),
+                            ]
+                            // todo!()
                         }
                         Join => {
                             // let edges = self.graph.kis(Option::None);

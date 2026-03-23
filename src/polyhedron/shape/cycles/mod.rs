@@ -133,6 +133,10 @@ impl Cycles {
             cycle.replace(old, new);
         }
     }
+
+    pub fn push(&mut self, cycle: Cycle) {
+        self.cycles.push(cycle);
+    }
 }
 
 impl From<&Distance> for Cycles {
