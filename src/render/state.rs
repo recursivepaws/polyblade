@@ -1,8 +1,8 @@
 use crate::{
-    bones::PolyGraph,
+    polyhedron::Polyhedron,
     render::{
         camera::Camera,
-        message::ColorMethodMessage,
+        message::{ColorMethodMessage, PresetMessage},
         palette::Palette,
         polydex::{Entry, InfoBox, Polydex},
     },
@@ -13,6 +13,7 @@ use iced::{time::Duration, Color};
 use std::{f32::consts::PI, io::Read as _};
 use ultraviolet::Mat4;
 
+#[derive(Debug, Default)]
 pub struct AppState {
     pub model: ModelState,
     pub render: RenderState,
@@ -76,19 +77,22 @@ impl Default for ColorPickerState {
 
 #[derive(Debug, Clone)]
 pub struct ModelState {
-    pub polyhedron: PolyGraph,
+    pub polyhedron: Polyhedron,
     pub transform: Mat4,
 }
 
 impl Default for ModelState {
     fn default() -> Self {
+        //log::error!("poly: {:?}", x.polyhedron);
         Self {
-            polyhedron: PolyGraph::dodecahedron(),
+            //polyhedron: { Polyhedron::preset(&PresetMessage::Octahedron) },
+            polyhedron: { Polyhedron::preset(&PresetMessage::Pyramid(3)) },
             transform: Mat4::identity(),
         }
     }
 }
 
+#[allow(dead_code)]
 pub fn load_polydex() -> Result<Polydex, Box<dyn std::error::Error>> {
     let mut polydex = std::fs::File::open("assets/polydex.ron")?;
     let mut polydex_str = String::new();
@@ -97,26 +101,15 @@ pub fn load_polydex() -> Result<Polydex, Box<dyn std::error::Error>> {
     Ok(polydex)
 }
 
-impl Default for AppState {
-    fn default() -> Self {
-        let info = PolyGraph::default().polydex_entry(&vec![]);
-        Self {
-            model: ModelState::default(),
-            render: RenderState::default(),
-            polydex: load_polydex().unwrap_or_default(),
-            info,
-        }
-    }
-}
-
 impl AppState {
     pub fn update_state(&mut self, time: Instant) {
         // Update the polyhedron using the difference in time between this and the previous frame
         let frame_difference = time.duration_since(self.render.frame).as_secs_f32();
         let framerate = 1.0 / 60.0;
+        //sleep_ms(800);
         // Fraction of a second since the previous frame rendered
         let second = if frame_difference > 1.0 / 60.0 {
-            log::warn!("took more than 1/60th of a second to render that frame");
+            // log::warn!("took more than 1/60th of a second to render that frame");
             framerate
         } else {
             frame_difference

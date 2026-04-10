@@ -194,7 +194,8 @@ impl App<'_> {
                     .moment_buf
                     .resize(&self.graphics.device, moments.len());
 
-                let shapes = primitive.shape_vertices();
+                let shapes = primitive.model.polyhedron.shape_vertices();
+                //log::error!("shapes: {shapes:?}");
                 scene.shape_buf.resize(&self.graphics.device, shapes.len());
                 scene.shape_buf.write_slice(&self.graphics.queue, &shapes);
             }
@@ -216,11 +217,7 @@ impl App<'_> {
             // Write Frag Uniforms
             scene.frag_buf.write_data(
                 &self.graphics.queue,
-                &FragUniforms {
-                    line_thickness: primitive.render.line_thickness,
-                    line_mode: 1.0,
-                    ..Default::default()
-                },
+                &FragUniforms::new(primitive.render.line_thickness, 1.0),
             );
             self.graphics.window.request_redraw();
         }
@@ -244,11 +241,7 @@ impl App<'_> {
             // Ignore the whole first polygon if we're in schlegel mode
             let starting_vertex = if program.state.render.schlegel {
                 // Determines how many vertices are actually used to render the polygon
-                match program.state.model.polyhedron.cycles[0].len() {
-                    3 => 3,
-                    4 => 6,
-                    n => n * 3,
-                }
+                program.state.model.polyhedron.starting_vertex()
             } else {
                 0
             } as u32;
@@ -322,7 +315,6 @@ impl ApplicationHandler for App<'_> {
                         return;
                     }
 
-                    //self.graphics.update();
                     match self.render() {
                         Ok(_) => {}
                         // Reconfigure the surface if it's lost or outdated
@@ -375,12 +367,13 @@ impl ApplicationHandler for App<'_> {
                                 // Operations
                                 "e" => Some(Expand),
                                 "d" => Some(Dual),
-                                "s" => Some(Snub),
+                                "s" => Some(SplitVertex(0)),
                                 "k" => Some(Kis),
                                 "j" => Some(Join),
                                 "a" => Some(Ambo),
                                 "t" => Some(Truncate),
                                 "b" => Some(Bevel),
+                                "c" => Some(Chamfer),
                                 _ => None,
                             }
                             .map(PolybladeMessage::Conway)

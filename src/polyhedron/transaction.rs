@@ -1,11 +1,13 @@
-use crate::{bones::Edge, render::message::ConwayMessage};
-use rustc_hash::FxHashSet as HashSet;
+use crate::render::message::ConwayMessage;
 use std::time::Instant;
+
+use super::VertexId;
 
 #[derive(Debug, Clone)]
 pub enum Transaction {
-    Contraction(HashSet<Edge>),
-    Release(HashSet<Edge>),
+    Contraction(Vec<[VertexId; 2]>),
+    #[allow(dead_code)]
+    Release(Vec<[VertexId; 2]>),
     Conway(ConwayMessage),
     #[allow(dead_code)]
     ShortenName(usize),

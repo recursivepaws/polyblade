@@ -8,8 +8,9 @@ ignore = ["RUSTSEC-2024-0384"]
 [licenses]
 allow = [
   "AGPL-3.0",
-  "AGPL-3.0-or-later",
   "Apache-2.0",
+  "AGPL-3.0-or-later",
+  "Unicode-3.0",
   "MIT",
   "Zlib",
   "BSL-1.0",
@@ -18,7 +19,6 @@ allow = [
   "CC0-1.0",
   "BSD-3-Clause",
   "BSD-2-Clause",
-  "Unicode-DFS-2016",
 ]
 
 [bans]

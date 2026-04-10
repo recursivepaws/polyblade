@@ -1,6 +1,6 @@
 mod app;
 mod camera;
-mod color;
+pub mod color;
 mod controls;
 mod menu;
 pub(crate) mod message;

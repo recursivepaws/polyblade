@@ -1,5 +1,5 @@
 use crate::{
-    bones::{PolyGraph, Transaction},
+    polyhedron::{Polyhedron, Transaction},
     render::camera::Camera,
     Instant,
 };
@@ -77,6 +77,7 @@ pub enum ConwayMessage {
     Kis,
     // Needle,
     // Zip,
+    SplitVertex(usize),
     Truncate,
     // 4
     //Ortho,
@@ -87,6 +88,8 @@ pub enum ConwayMessage {
     // // 6
     // Meta,
     Bevel,
+
+    Chamfer,
 }
 
 #[derive(Debug, Clone)]
@@ -152,26 +155,7 @@ pub trait ProcessMessage<T> {
 
 impl ProcessMessage<ModelState> for PresetMessage {
     fn process(&self, state: &mut ModelState) -> Task<PolybladeMessage> {
-        use PresetMessage::*;
-        match &self {
-            Prism(n) => {
-                state.polyhedron = PolyGraph::prism(*n);
-                if n == &4 {
-                    state.polyhedron.name = "C".into();
-                }
-            }
-            AntiPrism(n) => state.polyhedron = PolyGraph::anti_prism(*n),
-            Pyramid(n) => {
-                state.polyhedron = PolyGraph::pyramid(*n);
-                if n == &3 {
-                    state.polyhedron.name = "T".into();
-                }
-            }
-            Octahedron => state.polyhedron = PolyGraph::octahedron(),
-            Dodecahedron => state.polyhedron = PolyGraph::dodecahedron(),
-            Icosahedron => state.polyhedron = PolyGraph::icosahedron(),
-        }
-
+        state.polyhedron = Polyhedron::preset(self);
         Task::none()
     }
 }
@@ -262,6 +246,7 @@ impl ProcessMessage<ColorPickerState> for ColorPickerMessage {
 
 impl ProcessMessage<AppState> for PolybladeMessage {
     fn process(&self, state: &mut AppState) -> Task<PolybladeMessage> {
+        //println!("processing message: {self:?} for state {state:?}");
         use PolybladeMessage::*;
         match self {
             Tick(time) => {

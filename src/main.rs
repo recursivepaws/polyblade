@@ -1,4 +1,4 @@
-mod bones;
+mod polyhedron;
 mod render;
 use iced::futures::executor::block_on;
 use render::{App, Graphics};

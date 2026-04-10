@@ -31,6 +31,10 @@
     </p>
 </div>
 
+## WARNING
+This software is currently broken. Use the release published on crates.io or 0.1.0 while I fix it, which can be installed using the method below. 
+The main branch is not as functional as it once was, but this will be remedied soon post-refactor. 
+
 ## Installation
 ```cargo install polyblade```
 

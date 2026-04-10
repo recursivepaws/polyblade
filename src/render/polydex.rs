@@ -1,4 +1,4 @@
-use crate::{bones::PolyGraph, render::message::PolybladeMessage, Instant};
+use crate::{polyhedron::Polyhedron, render::message::PolybladeMessage, Instant};
 use serde::{Deserialize, Serialize};
 
 pub type Polydex = Vec<Entry>;
@@ -11,6 +11,7 @@ pub struct Entry {
     pub wiki: String,
 }
 
+#[derive(Debug, Default)]
 pub struct InfoBox {
     pub conway: String,
     pub faces: usize,
@@ -40,14 +41,14 @@ impl InfoBox {
     }
 }
 
-impl PolyGraph {
+impl Polyhedron {
     pub fn polydex_entry(&self, polydex: &Polydex) -> InfoBox {
         let entry = polydex.iter().find(|entry| entry.conway == self.name);
         InfoBox {
             conway: self.name.clone(),
-            faces: self.cycles.len(),
-            edges: self.edges.len(),
-            vertices: self.vertices.len(),
+            faces: 0,    //self.shape.cycles.len(),
+            edges: 0,    //self.shape.edges().count(),
+            vertices: 0, //self.shape.len(),
             name: entry.map(|e| e.name.clone()),
             bowers: entry.map(|e| e.bowers.clone()),
             wiki: entry.map(|e| e.wiki.clone()),
