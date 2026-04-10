@@ -47,6 +47,7 @@
             cargo
             rust-analyzer
             rustfmt
+            clippy
             rustc
             lld
             graphviz
