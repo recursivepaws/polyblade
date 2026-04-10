@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 mod bones;
 mod render;
 use iced::futures::executor::block_on;

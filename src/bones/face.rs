@@ -52,7 +52,7 @@ impl Face {
         self.0.len()
     }
 
-    pub fn iter(&self) -> std::slice::Iter<usize> {
+    pub fn iter(&self) -> std::slice::Iter<'_, usize> {
         self.0.iter()
     }
 

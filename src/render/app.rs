@@ -351,46 +351,43 @@ impl ApplicationHandler for App<'_> {
                 WindowEvent::CloseRequested => {
                     event_loop.exit();
                 }
-                WindowEvent::KeyboardInput { event, .. } => {
-                    if event.state.is_pressed() {
-                        let Some(key) = &event.text else {
-                            return;
-                        };
+                WindowEvent::KeyboardInput { event, .. } if event.state.is_pressed() => {
+                    let Some(key) = &event.text else {
+                        return;
+                    };
 
-                        let message = if key.as_str() == key.to_uppercase().as_str() {
-                            use PresetMessage::*;
-                            match key.to_lowercase().as_str() {
-                                // Presets
-                                "t" => Some(Pyramid(3)),
-                                "c" => Some(Prism(4)),
-                                "o" => Some(Octahedron),
-                                "d" => Some(Dodecahedron),
-                                "i" => Some(Icosahedron),
-                                _ => None,
-                            }
-                            .map(PolybladeMessage::Preset)
-                        } else {
-                            use ConwayMessage::*;
-                            match key.as_str() {
-                                // Operations
-                                "e" => Some(Expand),
-                                "d" => Some(Dual),
-                                "s" => Some(Snub),
-                                "k" => Some(Kis),
-                                "j" => Some(Join),
-                                "a" => Some(Ambo),
-                                "t" => Some(Truncate),
-                                "b" => Some(Bevel),
-                                _ => None,
-                            }
-                            .map(PolybladeMessage::Conway)
-                        };
-
-                        if let (Some(message), Some(AppData { state, .. })) =
-                            (message, &mut self.data)
-                        {
-                            state.queue_message(message);
+                    let message = if key.as_str() == key.to_uppercase().as_str() {
+                        use PresetMessage::*;
+                        match key.to_lowercase().as_str() {
+                            // Presets
+                            "t" => Some(Pyramid(3)),
+                            "c" => Some(Prism(4)),
+                            "o" => Some(Octahedron),
+                            "d" => Some(Dodecahedron),
+                            "i" => Some(Icosahedron),
+                            _ => None,
                         }
+                        .map(PolybladeMessage::Preset)
+                    } else {
+                        use ConwayMessage::*;
+                        match key.as_str() {
+                            // Operations
+                            "e" => Some(Expand),
+                            "d" => Some(Dual),
+                            "s" => Some(Snub),
+                            "k" => Some(Kis),
+                            "j" => Some(Join),
+                            "a" => Some(Ambo),
+                            "t" => Some(Truncate),
+                            "b" => Some(Bevel),
+                            _ => None,
+                        }
+                        .map(PolybladeMessage::Conway)
+                    };
+
+                    if let (Some(message), Some(AppData { state, .. })) = (message, &mut self.data)
+                    {
+                        state.queue_message(message);
                     }
                 }
                 WindowEvent::CursorMoved { position, .. } => {

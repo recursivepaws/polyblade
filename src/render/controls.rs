@@ -34,7 +34,7 @@ impl Program for Controls {
         message.process(&mut self.state)
     }
 
-    fn view(&self) -> Element<Self::Message, Self::Theme, Self::Renderer> {
+    fn view(&self) -> Element<'_, Self::Message, Self::Theme, Self::Renderer> {
         let mut button_row = Row::new().spacing(10);
         for (i, color) in self
             .state
