@@ -7,66 +7,62 @@ license-file = "LICENSE"
 description = "Make shapes dance."
 repository = "https://github.com/organizedgrime/polyblade"
 readme = "README.md"
-keywords = ["polyhedra", "graphics", "graphs", "WebGPU"]
+keywords = ["WebGPU", "graphics", "graphs", "polyhedra"]
 categories = [
-	"graphics",
-	"mathematics",
-	"visualization",
-	"wasm",
-	"web-programming",
+  "graphics",
+  "mathematics",
+  "visualization",
+  "wasm",
+  "web-programming",
 ]
 
 [dependencies]
 bytemuck = { version = "1.0", features = [
-	"derive",
-	"zeroable_maybe_uninit",
-	"zeroable_atomics",
+  "derive",
+  "zeroable_atomics",
+  "zeroable_maybe_uninit",
 ] }
-
+graphviz-rust = { version = "0.9.3" }
 iced_aw = { version = "0.11.0", default-features = false, features = ["menu"] }
-
+iced_wgpu = { version = "0.13", features = ["webgl"] }
+iced_widget = { version = "0.13", features = ["wgpu"] }
+iced_winit = { version = "0.13" }
+log = { version = "0.4.22" }
+rand = { version = "0.8.5" }
+ron = { version = "0.8" }
+rustc-hash = { version = "2.0.0" }
+serde = { version = "^1.0.0", features = ["derive"] }
 # Enum iteration
 strum = { version = "0.26.2" }
 strum_macros = { version = "0.26.2" }
-
 # Vector and Matrix math
 ultraviolet = { version = "0.9.2", features = ["bytemuck"] }
-rand = { version = "0.8.5" }
-serde = { version = "^1.0.0", features = ["derive"] }
-ron = { version = "0.8" }
-#ckmeans = { version = "1.0.6" }
+# ckmeans = { version = "1.0.6" }
 webbrowser = { version = "1.0.2" }
-iced_winit = { version = "0.13" }
-iced_widget = { version = "0.13", features = ["wgpu"] }
-iced_wgpu = { version = "0.13", features = ["webgl"] }
-log = { version = "0.4.22" }
-rustc-hash = { version = "2.0.0" }
-graphviz-rust = { version = "0.9.3" }
 
 [dev-dependencies]
 test-case = { version = "^3.3.0" }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-iced = { version = "0.13", features = ["debug", "advanced", "svg"] }
+iced = { version = "0.13", features = ["advanced", "debug", "svg"] }
 tracing-subscriber = { version = "0.3" }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-getrandom = { version = "0.2", features = ["js"] }
-web-sys = { version = "0.3", features = ["Document", "Window", "Element"] }
-wasm-bindgen = { version = "0.2" }
-iced = { version = "0.13", features = [
-	"debug",
-	"advanced",
-	"svg",
-	"webgl",
-	"debug",
-] }
 console_error_panic_hook = { version = "0.1" }
 console_log = { version = "1.0" }
-
-[profile.release]
-debug = true
+getrandom = { version = "0.2", features = ["js"] }
+iced = { version = "0.13", features = [
+  "advanced",
+  "debug",
+  "svg",
+  "webgl",
+] }
+wasm-bindgen = { version = "0.2" }
+web-sys = { version = "0.3", features = ["Document", "Element", "Window"] }
 
 [features]
 default = []
-#graphs = ["dep:layout-rs"]
+# graphs = ["dep:layout-rs"]
+
+[profile.release]
+debug = true
