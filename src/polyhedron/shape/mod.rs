@@ -69,7 +69,7 @@ impl Shape {
         self.distance.edges()
     }
 
-    pub fn vertices(&self) -> Range<VertexId> {
+    pub fn vertices(&self) -> impl Iterator<Item = VertexId> + use<'_> {
         self.distance.vertices()
     }
 

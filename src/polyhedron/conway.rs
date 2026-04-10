@@ -14,7 +14,8 @@ impl Polyhedron {
 
     pub fn truncate(&mut self, d: usize) -> Vec<[VertexId; 2]> {
         let mut new_edges = Vec::default();
-        for v in self.shape.vertices().rev() {
+        let vertices = self.shape.vertices().collect::<Vec<_>>();
+        for v in vertices.into_iter().rev() {
             if d == 0 || self.shape.degree(v) == d {
                 new_edges.extend(self.split_vertex(v));
                 self.shape.recompute();

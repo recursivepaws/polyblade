@@ -1,6 +1,5 @@
 use super::*;
 
-
 impl Distance {
     pub fn floyd(&mut self) {
         // let dist be a |V| × |V| array of minimum distances initialized to ∞ (infinity)
@@ -8,9 +7,11 @@ impl Distance {
         for e in self.edges() {
             graph[e] = 1;
         }
-        for k in graph.vertices() {
-            for i in graph.vertices() {
-                for j in graph.vertices() {
+
+        let vertices = self.vertices().collect::<Vec<_>>();
+        for &k in vertices.iter() {
+            for &i in vertices.iter() {
+                for &j in vertices.iter() {
                     if graph[[i, k]] != usize::MAX && graph[[k, j]] != usize::MAX {
                         let nv = graph[[i, k]] + graph[[k, j]];
                         if graph[[i, j]] > nv || graph[[j, i]] > nv {
