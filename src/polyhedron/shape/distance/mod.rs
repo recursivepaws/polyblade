@@ -6,14 +6,11 @@ mod svg;
 mod test;
 
 use crate::polyhedron::VertexId;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::{
     fmt::Display,
     ops::{Index, IndexMut, Range},
 };
-
-/// I want a mapping from "VertexId" to the actual index in the matrix.
-/// That way, when i remove something from the graph,
 
 /// Jagged array which represents the symmetrix distance matrix of a given Graph
 /// usize::MAX    ->   disconnected
@@ -23,11 +20,7 @@ use std::{
 pub(super) struct Distance {
     /// The order is the number of vertices
     order: usize,
-    /// The distance is the actual representation schema
-    /// Indexed by
     distance: Vec<usize>,
-    ///
-    indices: HashMap<VertexId, usize>,
 }
 
 impl Distance {
@@ -42,7 +35,6 @@ impl Distance {
             distance: (0..n)
                 .flat_map(|m| [vec![usize::MAX; m], vec![0]].concat())
                 .collect(),
-            indices: (0..n).map(|m| (m, m)).collect::<HashMap<VertexId, usize>>(),
         }
     }
 }
@@ -82,16 +74,7 @@ impl Distance {
                 }
             }
         }
-
         *self = distance;
-
-        let noted_index = self.indices.remove(&v).unwrap();
-        let keys: Vec<usize> = self.indices.keys().clone().cloned().collect();
-        for id in keys {
-            if self.indices[&id] > noted_index {
-                *self.indices.get_mut(&id).unwrap() -= 1;
-            }
-        }
     }
 
     /// Enumerates the vertices connected to v
@@ -100,12 +83,12 @@ impl Distance {
     }
 
     /// Iterable Range representing vertex IDs
-    pub fn vertices(&self) -> impl Iterator<Item = VertexId> + use<'_> {
-        self.indices.keys().into_iter().cloned()
+    pub fn vertices(&self) -> Range<VertexId> {
+        0..self.order
     }
 
     /// All possible compbinations of vertices
-    pub fn vertex_pairs(&self) -> impl Iterator<Item = [VertexId; 2]> + use<'_> {
+    pub fn vertex_pairs(&self) -> impl Iterator<Item = [VertexId; 2]> {
         self.vertices().flat_map(|v| (0..v).map(move |u| [v, u]))
     }
 
@@ -157,7 +140,7 @@ impl Distance {
 
     /// Use a simple BFS to compute the shortest paths for all pairs
     pub fn bfs_apsp(&mut self) {
-        for source in self.vertices().collect::<Vec<_>>() {
+        for source in self.vertices() {
             let mut visited = vec![false; self.order()];
             let mut queue = vec![source];
             visited[source] = true;
@@ -191,20 +174,16 @@ impl Index<[VertexId; 2]> for Distance {
     type Output = usize;
 
     fn index(&self, index: [VertexId; 2]) -> &Self::Output {
-        let i0 = self.indices[&index[0]];
-        let i1 = self.indices[&index[1]];
-        let x = i0.max(i1);
-        let y = i0.min(i1);
+        let x = index[0].max(index[1]);
+        let y = index[0].min(index[1]);
         &self.distance[(x * (x + 1)) / 2 + y]
     }
 }
 
 impl IndexMut<[VertexId; 2]> for Distance {
     fn index_mut(&mut self, index: [VertexId; 2]) -> &mut Self::Output {
-        let i0 = self.indices[&index[0]];
-        let i1 = self.indices[&index[1]];
-        let x = i0.max(i1);
-        let y = i0.min(i1);
+        let x = index[0].max(index[1]);
+        let y = index[0].min(index[1]);
         &mut self.distance[(x * (x + 1)) / 2 + y]
     }
 }
