@@ -61,6 +61,7 @@
           libxkbcommon
           vulkan-loader
           libGL
+          fontconfig
           libx11
           libxcursor
           libxi
