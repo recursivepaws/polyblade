@@ -25,12 +25,10 @@
           overlays = [ rust-overlay.overlays.default ];
         };
 
-        dioxusCliVersion = "0.7.0-alpha.2";
-
         # wasm-bindgen's CLI version must match the `wasm-bindgen` crate version
         # resolved in Cargo.lock exactly, or `dx` fails at build time with a
         # "schema version mismatch" error.
-        wasmBindgenCli = pkgs.wasm-bindgen-cli_0_2_100;
+        wasmBindgenCli = pkgs.wasm-bindgen-cli_0_2_126;
 
         rustToolchain = pkgs.rust-bin.stable.latest.default.override {
           extensions = [
@@ -63,7 +61,7 @@
             [
               rustToolchain
               pkg-config
-              cargo-binstall
+              dioxus-cli
               wasmBindgenCli
               binaryen # provides wasm-opt, used by `dx bundle --release`
               tailwindcss # v3 standalone CLI, matches tailwind.config.js
@@ -81,21 +79,6 @@
 
           shellHook = ''
             export CARGO_TARGET_DIR="$PWD/target"
-
-            # Installed project-locally (not ~/.cargo/bin): mkShell's PATH
-            # doesn't reliably inherit the user's global cargo bin dir
-            # (especially under nix-direnv), and this also keeps the pinned
-            # alpha `dx` from clashing with other dioxus projects on disk.
-            export DX_BIN_DIR="$PWD/.bin"
-            mkdir -p "$DX_BIN_DIR"
-            export PATH="$DX_BIN_DIR:$PATH"
-
-            if ! command -v dx >/dev/null 2>&1 || \
-                [ "$(dx --version 2>/dev/null | awk '{print $2}')" != "${dioxusCliVersion}" ]; then
-              echo "installing dioxus-cli ${dioxusCliVersion} (pinned to match Cargo.toml) ..."
-              echo "(this will build from source if no prebuilt binary exists for this alpha tag - can take a while)"
-              cargo binstall -y --locked --install-path "$DX_BIN_DIR" "dioxus-cli@${dioxusCliVersion}"
-            fi
 
             echo ""
             echo "polyblade dev shell ready:"
