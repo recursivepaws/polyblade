@@ -1,18 +1,19 @@
 use cfg_if::cfg_if;
-use dioxus::{html::g::fill, prelude::*};
-use log::info;
-use polyblade::{
-    graphics::{Vertex, WGPUInstance},
-    renderer::{Renderer, Triangle},
-};
+use dioxus::prelude::*;
+use polyblade::{graphics::Vertex, renderer::Triangle};
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
 use ultraviolet::Vec3;
 
 #[cfg(target_arch = "wasm32")]
-use wgpu::SurfaceTarget::Canvas;
+use {
+    log::info,
+    polyblade::{graphics::WGPUInstance, renderer::Renderer},
+    wgpu::SurfaceTarget::Canvas,
+};
 
-// #[cfg(not(target_arch = "wasm32"))]
+#[cfg(all(not(target_arch = "wasm32"), feature = "native"))]
+use polyblade::native_paint::PolybladePaintSource;
 
 #[derive(Debug, Clone, Routable, PartialEq)]
 #[rustfmt::skip]
@@ -96,9 +97,8 @@ fn Home() -> Element {
     }
 }
 
-#[component]
-pub fn SpinningCube() -> Element {
-    let triangle: Triangle = vec![
+fn triangle_model() -> Triangle {
+    vec![
         Vertex {
             position: Vec3::new(0.0, 0.5, 0.0),
             color: Vec3::new(1.0, 0.0, 0.0),
@@ -111,32 +111,69 @@ pub fn SpinningCube() -> Element {
             position: Vec3::new(0.5, -0.5, 0.0),
             color: Vec3::new(0.0, 0.0, 1.0),
         },
-    ];
+    ]
+}
 
-    #[cfg(target_arch = "wasm32")]
-    use_effect(move || {
-        if let Some(el) = polyblade::get_canvas(&"wgpu-canvas") {
-            let tri = triangle.clone();
+#[component]
+pub fn SpinningCube() -> Element {
+    cfg_if! {
+        if #[cfg(target_arch = "wasm32")] {
+            let triangle = triangle_model();
 
-            spawn(async move {
-                let gpu = WGPUInstance::new(Canvas(el)).await;
-                info!("wgpu_instance created");
-                let renderer = Renderer::new(&gpu.device, gpu.config.format, &tri);
-                renderer.render_surface(&gpu);
+            use_effect(move || {
+                if let Some(el) = polyblade::get_canvas(&"wgpu-canvas") {
+                    let tri = triangle.clone();
+
+                    spawn(async move {
+                        let gpu = WGPUInstance::new(Canvas(el)).await;
+                        info!("wgpu_instance created");
+                        let renderer = Renderer::new(&gpu.device, gpu.config.format, &tri);
+                        renderer.render_surface(&gpu);
+                    });
+                } else {
+                    info!("failed to find canvas.")
+                }
             });
-        } else {
-            info!("failed to find canvas.")
-        }
-    });
 
-    rsx! {
-        div { class: "canvas-div",
-            canvas { id: "wgpu-canvas", width: 1000, height: 1000 }
-            img {
-                id: "error-background",
-                src: "{ERRORBG}",
-                object_fit: "contain",
-                background_color: "white",
+            rsx! {
+                div { class: "canvas-div",
+                    canvas { id: "wgpu-canvas", width: 1000, height: 1000 }
+                    img {
+                        id: "error-background",
+                        src: "{ERRORBG}",
+                        object_fit: "contain",
+                        background_color: "white",
+                    }
+                }
+            }
+        } else if #[cfg(feature = "native")] {
+            let paint_id = dioxus_native::use_wgpu(move || {
+                PolybladePaintSource::new(triangle_model())
+            });
+
+            rsx! {
+                div { class: "canvas-div",
+                    canvas { id: "wgpu-canvas", "src": paint_id, width: 1000, height: 1000 }
+                    img {
+                        id: "error-background",
+                        src: "{ERRORBG}",
+                        object_fit: "contain",
+                        background_color: "white",
+                    }
+                }
+            }
+        } else {
+            // Server/fullstack builds have no GPU surface; render the static shell only.
+            rsx! {
+                div { class: "canvas-div",
+                    canvas { id: "wgpu-canvas", width: 1000, height: 1000 }
+                    img {
+                        id: "error-background",
+                        src: "{ERRORBG}",
+                        object_fit: "contain",
+                        background_color: "white",
+                    }
+                }
             }
         }
     }

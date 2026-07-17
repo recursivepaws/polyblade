@@ -53,6 +53,20 @@
           librsvg
           libayatana-appindicator
         ];
+
+        # Runtime libraries for the winit/wgpu native renderer (dx serve --native).
+        runtimeLibs = with pkgs; [
+          wayland
+          wayland-protocols
+          libxkbcommon
+          vulkan-loader
+          libGL
+          libx11
+          libxcursor
+          libxi
+          libxrandr
+          libxxf86vm
+        ];
       in
       {
         devShells.default = pkgs.mkShell {
@@ -75,14 +89,15 @@
 
           buildInputs = with pkgs; [ openssl ] ++ webviewLibs;
 
-          LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath webviewLibs;
+          LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath (webviewLibs ++ runtimeLibs);
 
           shellHook = ''
             export CARGO_TARGET_DIR="$PWD/target"
 
             echo ""
             echo "polyblade dev shell ready:"
-            echo "  dx serve --platform web                                          # run the app"
+            echo "  dx serve --platform web                                          # run in browser"
+            echo "  dx serve --platform linux --renderer native                      # run as native window"
             echo "  tailwindcss -i ./tailwind.css -o ./assets/tailwind.css --watch  # css"
           '';
         };
