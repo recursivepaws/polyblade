@@ -1,10 +1,9 @@
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
-use wgpu::wgt::{CommandEncoderDescriptor, TextureViewDescriptor};
 use wgpu::{
     include_wgsl, BlendState, Buffer, BufferUsages, Color, ColorTargetState, ColorWrites,
-    FragmentState, LoadOp, MultisampleState, Operations, PipelineLayoutDescriptor, PrimitiveState,
-    RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor,
-    StoreOp, VertexState,
+    CommandEncoderDescriptor, FragmentState, LoadOp, MultisampleState, Operations,
+    PipelineLayoutDescriptor, PrimitiveState, RenderPassColorAttachment, RenderPassDescriptor,
+    RenderPipeline, RenderPipelineDescriptor, StoreOp, TextureViewDescriptor, VertexState,
 };
 
 use crate::graphics::{Vertex, WGPUInstance};
@@ -88,6 +87,7 @@ impl Renderer {
                         load: LoadOp::Clear(Color::BLACK),
                         store: StoreOp::Store,
                     },
+                    depth_slice: None,
                 })],
                 depth_stencil_attachment: None,
                 timestamp_writes: None,

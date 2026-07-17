@@ -1,7 +1,7 @@
 use bytemuck::{Pod, Zeroable};
 use ultraviolet::Vec3;
-use wgpu::wgt::DeviceDescriptor;
 use log::info;
+use wgpu::DeviceDescriptor;
 
 #[cfg(target_arch = "wasm32")]
 use {wgpu::SurfaceTarget::Canvas};
