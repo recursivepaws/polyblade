@@ -121,8 +121,8 @@ pub fn SpinningCube() -> Element {
             spawn(async move {
                 let gpu = WGPUInstance::new(Canvas(el)).await;
                 info!("wgpu_instance created");
-                let renderer = Renderer::new(&gpu, &tri);
-                renderer.render(&gpu);
+                let renderer = Renderer::new(&gpu.device, gpu.config.format, &tri);
+                renderer.render_surface(&gpu);
             });
         } else {
             info!("failed to find canvas.")

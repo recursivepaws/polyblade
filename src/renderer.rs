@@ -1,9 +1,10 @@
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
 use wgpu::{
     include_wgsl, BlendState, Buffer, BufferUsages, Color, ColorTargetState, ColorWrites,
-    CommandEncoderDescriptor, FragmentState, LoadOp, MultisampleState, Operations,
-    PipelineLayoutDescriptor, PrimitiveState, RenderPassColorAttachment, RenderPassDescriptor,
-    RenderPipeline, RenderPipelineDescriptor, StoreOp, TextureViewDescriptor, VertexState,
+    CommandEncoderDescriptor, Device, FragmentState, LoadOp, MultisampleState, Operations,
+    PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPassColorAttachment,
+    RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor, StoreOp, TextureFormat,
+    TextureView, TextureViewDescriptor, VertexState,
 };
 
 use crate::graphics::{Vertex, WGPUInstance};
@@ -16,9 +17,7 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    pub fn new(gpu: &WGPUInstance, model: &Triangle) -> Self {
-        let WGPUInstance { device, config, .. } = gpu;
-
+    pub fn new(device: &Device, format: TextureFormat, model: &Triangle) -> Self {
         let vertex_buffer = device.create_buffer_init(&BufferInitDescriptor {
             label: Some("Vertex Buff"),
             contents: bytemuck::cast_slice(&model),
@@ -46,7 +45,7 @@ impl Renderer {
                 module: &shader,
                 entry_point: Some("fs_main"),
                 targets: &[Some(ColorTargetState {
-                    format: config.format,
+                    format,
                     blend: Some(BlendState::REPLACE),
                     write_mask: ColorWrites::ALL,
                 })],
@@ -65,14 +64,14 @@ impl Renderer {
         }
     }
 
-    pub fn render(&self, gpu: &WGPUInstance) {
-        let WGPUInstance {
-            surface, device, ..
-        } = gpu;
-
-        let frame = surface.get_current_texture().unwrap();
+    pub fn render_surface(&self, gpu: &WGPUInstance) {
+        let frame = gpu.surface.get_current_texture().unwrap();
         let view = frame.texture.create_view(&TextureViewDescriptor::default());
+        self.render_to_view(&gpu.device, &gpu.queue, &view);
+        frame.present();
+    }
 
+    pub fn render_to_view(&self, device: &Device, queue: &Queue, view: &TextureView) {
         let mut encoder = device.create_command_encoder(&CommandEncoderDescriptor {
             label: Some("Command Encoder"),
         });
@@ -81,7 +80,7 @@ impl Renderer {
             let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
                 label: Some("Render Pass"),
                 color_attachments: &[Some(RenderPassColorAttachment {
-                    view: &view,
+                    view,
                     resolve_target: None,
                     ops: Operations {
                         load: LoadOp::Clear(Color::BLACK),
@@ -99,7 +98,6 @@ impl Renderer {
             render_pass.draw(0..3, 0..1);
         }
 
-        gpu.queue.submit(Some(encoder.finish()));
-        frame.present();
+        queue.submit(Some(encoder.finish()));
     }
 }
