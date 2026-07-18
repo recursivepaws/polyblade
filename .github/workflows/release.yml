@@ -3,6 +3,12 @@ name: release
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      skip_release:
+        description: "Dry run: build the bundle matrix but skip creating the GitHub Release/tag"
+        type: boolean
+        default: true
 
 jobs:
   check-version:
@@ -68,6 +74,7 @@ jobs:
 
   github-release:
     needs: [check-version, bundle]
+    if: github.event_name == 'push' || github.event.inputs.skip_release != 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write

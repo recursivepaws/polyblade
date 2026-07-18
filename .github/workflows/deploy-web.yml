@@ -3,6 +3,7 @@ name: deploy-web
 on:
   push:
     branches: [main]
+  workflow_dispatch: {}
 
 jobs:
   deploy:
@@ -34,4 +35,9 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-        run: vercel deploy dist/public --prod --token="$VERCEL_TOKEN" --yes
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            vercel deploy dist/public --prod --token="$VERCEL_TOKEN" --yes
+          else
+            vercel deploy dist/public --token="$VERCEL_TOKEN" --yes
+          fi
