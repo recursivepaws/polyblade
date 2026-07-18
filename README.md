@@ -5,7 +5,7 @@
         <a href="https://polyblade.app">
             <img src="https://img.shields.io/website?url=https%3A//polyblade.app&label=demo&logo=webgpu&logoSize=auto&style=for-the-badge"/>
         </a>
-        <a href="https://github.com/organizedgrime/polyblade/actions/workflows/ci.yml">
+        <a href="https://github.com/recursivepaws/polyblade/actions/workflows/ci.yml">
             <img src="https://img.shields.io/github/actions/workflow/status/recursivepaws/polyblade/ci.yml?style=for-the-badge&label=CI%20Status"/>
         </a>
         <a href="LICENSE">
