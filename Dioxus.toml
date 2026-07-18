@@ -19,3 +19,12 @@ script = []
 # Javascript code file
 # serve: [dev-server] only
 script = []
+
+[bundle]
+identifier = "lgbt.vera.polyblade"
+publisher = "Vera Gonzalez"
+icon = ["assets/logo.png"]
+category = "Graphics"
+short_description = "Make shapes dance."
+long_description = "A cross-platform application for visualizing and animating Conway polyhedron operations."
+copyright = "Copyright © 2026 Vera Gonzalez"

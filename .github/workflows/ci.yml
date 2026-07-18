@@ -13,4 +13,4 @@ jobs:
   rust:
     uses: ./.github/workflows/rust.yml
     with:
-      cache_version: v1
+      cache_version: v2

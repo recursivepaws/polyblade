@@ -5,64 +5,12 @@ on:
     inputs:
       cache_version:
         type: string
-        default: v1
-      cargo_audit_version:
-        type: string
-        default: 0.20.0
-      cargo_audit_ignores:
-        type: string
-        default: ""
-        description: Comma-delimited list of RUSTSEC CVE identifiers to ignore during audit.
+        default: v2
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/cache@v4
-        with:
-          key: ${{ runner.os }}-${{ github.workflow }}-${{ inputs.cache_version }}-rust-${{ github.job }}-${{ hashFiles('**/Cargo.toml', '**/Cargo.lock') }}-${{ github.sha }}
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/cache/
-            ~/.cargo/registry/index/
-            ~/.cargo/git/db/
-            target/
-          restore-keys: |
-            ${{ runner.os }}-${{ github.workflow }}-${{ inputs.cache_version }}-rust-${{ github.job }}-${{ hashFiles('**/Cargo.toml', '**/Cargo.lock') }}-
-            ${{ runner.os }}-${{ github.workflow }}-${{ inputs.cache_version }}-rust-${{ github.job }}-
-      # NOTE this is done because microsoft is horrible at hosting apt repos and has historically broken this build
-      - name: install main ubuntu apt repository
-        run: |-
-          sudo tee /etc/apt/sources.list <<EOF
-          deb http://archive.ubuntu.com/ubuntu/ jammy main restricted
-          deb http://archive.ubuntu.com/ubuntu/ jammy-updates main restricted
-          deb http://archive.ubuntu.com/ubuntu/ jammy universe
-          deb http://archive.ubuntu.com/ubuntu/ jammy-updates universe
-          deb http://archive.ubuntu.com/ubuntu/ jammy multiverse
-          deb http://archive.ubuntu.com/ubuntu/ jammy-updates multiverse
-          deb http://archive.ubuntu.com/ubuntu/ jammy-backports main restricted universe multiverse
-          deb http://archive.ubuntu.com/ubuntu/ jammy-security main restricted
-          deb http://archive.ubuntu.com/ubuntu/ jammy-security universe
-          deb http://archive.ubuntu.com/ubuntu/ jammy-security multiverse
-          EOF
-      - name: install system dependencies
-        run: |
-          sudo DEBIAN_FRONTEND=noninteractive apt-get clean >/dev/null && \
-            sudo DEBIAN_FRONTEND=noninteractive apt-get update >/dev/null && \
-            sudo DEBIAN_FRONTEND=noninteractive apt-get install -y build-essential musl musl-dev musl-tools libssl-dev
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: x86_64-unknown-linux-musl
-      - uses: cargo-bins/cargo-binstall@main
-      - run: cargo binstall -y cargo-auditable
-      - uses: rui314/setup-mold@v1
-      - run: ld --version
-      - run: mold -run cargo auditable build --target x86_64-unknown-linux-musl --all-targets --release --bins
-
   test:
     runs-on: ubuntu-latest
     steps:
@@ -87,6 +35,9 @@ jobs:
 
   format:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/cache@v4
@@ -117,6 +68,10 @@ jobs:
         run: mold -run cargo +nightly fmt --all --check
       - name: cargo clippy
         run: mold -run cargo clippy --all-targets --all-features --tests -- -D warnings
+      - uses: DeterminateSystems/determinate-nix-action@v3
+      - uses: DeterminateSystems/flakehub-cache-action@main
+      - name: dx fmt --check
+        run: nix develop -c dx fmt --check
 
   audit:
     runs-on: ubuntu-latest
@@ -144,15 +99,19 @@ jobs:
       - name: advisories
         run: mold -run cargo deny check advisories
 
-  wasm:
+  dx-build-web:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
+      - uses: DeterminateSystems/determinate-nix-action@v3
+      - uses: DeterminateSystems/flakehub-cache-action@main
       - uses: actions/cache@v4
         with:
           key: ${{ runner.os }}-${{ github.workflow }}-${{ inputs.cache_version }}-rust-${{ github.job }}-${{ hashFiles('**/Cargo.toml', '**/Cargo.lock') }}-${{ github.sha }}
           path: |
-            ~/.cargo/bin/
             ~/.cargo/registry/cache/
             ~/.cargo/registry/index/
             ~/.cargo/git/db/
@@ -160,12 +119,32 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-${{ github.workflow }}-${{ inputs.cache_version }}-rust-${{ github.job }}-${{ hashFiles('**/Cargo.toml', '**/Cargo.lock') }}-
             ${{ runner.os }}-${{ github.workflow }}-${{ inputs.cache_version }}-rust-${{ github.job }}-
-      - uses: dtolnay/rust-toolchain@stable
+      - name: regenerate tailwind CSS
+        run: nix develop -c tailwindcss -i ./tailwind.css -o ./assets/tailwind.css --minify
+      - name: dx build --platform web
+        run: nix develop -c dx build --platform web
+
+  dx-build-native:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/determinate-nix-action@v3
+      - uses: DeterminateSystems/flakehub-cache-action@main
+      - uses: actions/cache@v4
         with:
-          targets: wasm32-unknown-unknown
-      - uses: cargo-bins/cargo-binstall@main
-      - run: cargo binstall -y trunk
-      - uses: rui314/setup-mold@v1
-      - run: ld --version
-      - name: trunk build
-        run: trunk build
+          key: ${{ runner.os }}-${{ github.workflow }}-${{ inputs.cache_version }}-rust-${{ github.job }}-${{ hashFiles('**/Cargo.toml', '**/Cargo.lock') }}-${{ github.sha }}
+          path: |
+            ~/.cargo/registry/cache/
+            ~/.cargo/registry/index/
+            ~/.cargo/git/db/
+            target/
+          restore-keys: |
+            ${{ runner.os }}-${{ github.workflow }}-${{ inputs.cache_version }}-rust-${{ github.job }}-${{ hashFiles('**/Cargo.toml', '**/Cargo.lock') }}-
+            ${{ runner.os }}-${{ github.workflow }}-${{ inputs.cache_version }}-rust-${{ github.job }}-
+      - name: regenerate tailwind CSS
+        run: nix develop -c tailwindcss -i ./tailwind.css -o ./assets/tailwind.css --minify
+      - name: dx build --platform linux --renderer native
+        run: nix develop -c dx build --platform linux --renderer native
