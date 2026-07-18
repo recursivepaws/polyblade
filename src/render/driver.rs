@@ -1,10 +1,10 @@
 use crate::{
+    Instant,
     render::{
         message::{PolybladeMessage, ProcessMessage},
         pipeline::{FragUniforms, ModelUniforms, PolyhedronPrimitive, Scene},
         state::AppState,
     },
-    Instant,
 };
 use wgpu::{CommandEncoderDescriptor, Device, Queue, TextureFormat, TextureView};
 

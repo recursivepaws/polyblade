@@ -1,8 +1,6 @@
 use cfg_if::cfg_if;
 use dioxus::prelude::*;
-use polyblade::render::message::{
-    push_message, ConwayMessage, PolybladeMessage, PresetMessage,
-};
+use polyblade::render::message::{ConwayMessage, PolybladeMessage, PresetMessage, push_message};
 
 mod components;
 use components::MenuBar;
@@ -10,7 +8,7 @@ use components::MenuBar;
 #[cfg(target_arch = "wasm32")]
 use {
     log::info,
-    polyblade::{graphics::WGPUInstance, render::driver::RenderDriver, Instant},
+    polyblade::{Instant, graphics::WGPUInstance, render::driver::RenderDriver},
     wgpu::{SurfaceTarget::Canvas, TextureViewDescriptor},
 };
 

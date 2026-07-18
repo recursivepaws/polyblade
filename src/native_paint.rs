@@ -1,4 +1,4 @@
-use crate::{render::driver::RenderDriver, Instant};
+use crate::{Instant, render::driver::RenderDriver};
 use dioxus_native::{CustomPaintCtx, CustomPaintSource, DeviceHandle, TextureHandle};
 use wgpu::{
     Device, Extent3d, Queue, Texture, TextureDescriptor, TextureDimension, TextureFormat,
@@ -102,10 +102,12 @@ impl ActiveRenderer {
             }
         };
 
-        let view = texture_and_handle.texture.create_view(&TextureViewDescriptor {
-            format: Some(TextureFormat::Rgba8UnormSrgb),
-            ..Default::default()
-        });
+        let view = texture_and_handle
+            .texture
+            .create_view(&TextureViewDescriptor {
+                format: Some(TextureFormat::Rgba8UnormSrgb),
+                ..Default::default()
+            });
         let handle = texture_and_handle.handle.clone();
 
         self.driver.resize(&self.device, width, height);

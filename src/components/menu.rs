@@ -1,6 +1,6 @@
 use dioxus::prelude::*;
 use polyblade::render::message::{
-    push_message, ConwayMessage, PolybladeMessage, PresetMessage, RenderMessage,
+    ConwayMessage, PolybladeMessage, PresetMessage, RenderMessage, push_message,
 };
 use strum::IntoEnumIterator;
 

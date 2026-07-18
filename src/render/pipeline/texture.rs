@@ -8,12 +8,7 @@ impl Texture {
     pub const SAMPLE_COUNT: u32 = 4;
 
     pub fn depth_texture(device: &wgpu::Device, target_size: (u32, u32)) -> Self {
-        Self::render_attachment(
-            device,
-            "Depth Texture",
-            Self::DEPTH_FORMAT,
-            target_size,
-        )
+        Self::render_attachment(device, "Depth Texture", Self::DEPTH_FORMAT, target_size)
     }
 
     /// Multisampled color target that gets resolved into the output texture.

@@ -12,11 +12,11 @@ mod test;
 
 use std::{collections::HashMap, time::Duration};
 
+use crate::Instant;
 use crate::render::{
     message::{ConwayMessage, PresetMessage},
     pipeline::{MomentVertex, ShapeVertex},
 };
-use crate::Instant;
 use ultraviolet::{Vec3, Vec4};
 
 pub type VertexId = usize;

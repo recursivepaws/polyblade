@@ -1,7 +1,7 @@
 use crate::{
+    Instant,
     polyhedron::{Polyhedron, Transaction},
     render::{camera::Camera, color::RGBA},
-    Instant,
 };
 use std::fmt::Display;
 use strum_macros::{Display, EnumIter};

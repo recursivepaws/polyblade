@@ -5,8 +5,8 @@ use wgpu::DeviceDescriptor;
 use wgpu::SurfaceTarget::Canvas;
 
 use wgpu::{
-    Device, Instance, PowerPreference, Queue, RequestAdapterOptions, Surface,
-    SurfaceConfiguration, SurfaceTarget, TextureFormat,
+    Device, Instance, PowerPreference, Queue, RequestAdapterOptions, Surface, SurfaceConfiguration,
+    SurfaceTarget, TextureFormat,
 };
 
 pub struct WGPUInstance<'window> {

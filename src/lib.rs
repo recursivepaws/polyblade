@@ -12,7 +12,7 @@ pub use web_time::Instant;
 #[cfg(target_arch = "wasm32")]
 use web_sys::{
     wasm_bindgen::JsCast,
-    {window, HtmlCanvasElement},
+    {HtmlCanvasElement, window},
 };
 
 #[cfg(target_arch = "wasm32")]

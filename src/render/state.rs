@@ -1,4 +1,5 @@
 use crate::{
+    Instant,
     polyhedron::Polyhedron,
     render::{
         camera::Camera,
@@ -6,7 +7,6 @@ use crate::{
         message::{ColorMethodMessage, PresetMessage},
         palette::Palette,
     },
-    Instant,
 };
 
 use std::{f32::consts::PI, time::Duration};
