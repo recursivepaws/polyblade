@@ -32,10 +32,14 @@ pub const OPENGL_TO_WGPU_MATRIX: Mat4 = Mat4::new(
 
 impl Camera {
     pub fn build_view_proj_mat(&self, width: f32, height: f32) -> Mat4 {
-        let aspect_ratio = width / height;
         let view = Mat4::look_at(self.eye, self.target, self.up);
-        let h = f32::cos(0.5 * self.fov_y) / f32::sin(0.5 * self.fov_y);
-        let w = h / aspect_ratio;
+        // Anchor the FOV to the smaller dimension so the polyhedron fills the
+        // largest circle inscribable in the viewport: proportions stay fixed
+        // at any aspect ratio, with no stretching or clipping.
+        let s = f32::cos(0.5 * self.fov_y) / f32::sin(0.5 * self.fov_y);
+        let m = width.min(height);
+        let w = s * m / width;
+        let h = s * m / height;
         let r = self.far / (self.near - self.far);
         let proj = Mat4::new(
             Vec4::new(w, 0.0, 0.0, 0.0),

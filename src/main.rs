@@ -127,12 +127,30 @@ pub fn PolyhedronCanvas() -> Element {
             use_effect(move || {
                 if let Some(el) = polyblade::get_canvas("wgpu-canvas") {
                     spawn(async move {
-                        let gpu = WGPUInstance::new(Canvas(el)).await;
+                        let canvas = el.clone();
+                        let mut gpu = WGPUInstance::new(Canvas(el)).await;
                         info!("wgpu_instance created");
                         let (width, height) = (gpu.config.width, gpu.config.height);
                         let mut driver =
                             RenderDriver::new(&gpu.device, gpu.render_format, width, height);
                         loop {
+                            // Keep the backing store at the canvas's displayed
+                            // size in physical pixels so nothing is stretched.
+                            let dpr = web_sys::window().unwrap().device_pixel_ratio();
+                            let width = (canvas.client_width() as f64 * dpr) as u32;
+                            let height = (canvas.client_height() as f64 * dpr) as u32;
+                            if width > 0
+                                && height > 0
+                                && (width, height) != (gpu.config.width, gpu.config.height)
+                            {
+                                canvas.set_width(width);
+                                canvas.set_height(height);
+                                gpu.config.width = width;
+                                gpu.config.height = height;
+                                gpu.surface.configure(&gpu.device, &gpu.config);
+                                driver.resize(&gpu.device, width, height);
+                            }
+
                             driver.tick(Instant::now());
                             let frame = gpu
                                 .surface

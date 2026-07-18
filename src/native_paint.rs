@@ -66,11 +66,12 @@ impl CustomPaintSource for PolybladePaintSource {
         ctx: CustomPaintCtx<'_>,
         width: u32,
         height: u32,
-        _scale: f64,
+        scale: f64,
     ) -> Option<TextureHandle> {
         if width == 0 || height == 0 {
             return None;
         }
+        log::debug!("paint size {width}x{height} scale {scale}");
         let State::Active(state) = &mut self.state else {
             return None;
         };

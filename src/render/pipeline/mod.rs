@@ -15,7 +15,9 @@ pub struct Scene {
     pub model_buf: Buffer,
     pub frag_buf: Buffer,
     uniform_group: wgpu::BindGroup,
-    pub depth_texture: Texture,
+    texture_format: wgpu::TextureFormat,
+    depth_texture: Texture,
+    msaa_texture: Texture,
 }
 
 impl Scene {
@@ -47,6 +49,7 @@ impl Scene {
             ],
         });
         let depth_texture = Texture::depth_texture(device, size);
+        let msaa_texture = Texture::msaa_texture(device, texture_format, size);
 
         Scene {
             pipeline,
@@ -55,8 +58,16 @@ impl Scene {
             model_buf,
             frag_buf,
             uniform_group,
+            texture_format,
             depth_texture,
+            msaa_texture,
         }
+    }
+
+    /// Recreates the render-target-sized attachments (depth + MSAA color).
+    pub fn resize(&mut self, device: &wgpu::Device, size: (u32, u32)) {
+        self.depth_texture = Texture::depth_texture(device, size);
+        self.msaa_texture = Texture::msaa_texture(device, self.texture_format, size);
     }
 
     pub fn clear<'a>(
@@ -68,12 +79,13 @@ impl Scene {
         encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: None,
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: target,
+                view: &self.msaa_texture.view,
                 depth_slice: None,
-                resolve_target: None,
+                resolve_target: Some(target),
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Clear(background_color),
-                    store: wgpu::StoreOp::Store,
+                    // Only the resolved output is needed after the pass.
+                    store: wgpu::StoreOp::Discard,
                 },
             })],
             depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
@@ -182,7 +194,10 @@ impl Scene {
                 stencil: StencilState::default(),
                 bias: DepthBiasState::default(),
             }),
-            multisample: wgpu::MultisampleState::default(),
+            multisample: wgpu::MultisampleState {
+                count: Texture::SAMPLE_COUNT,
+                ..Default::default()
+            },
             multiview: None,
             cache: None,
         })

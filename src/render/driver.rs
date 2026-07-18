@@ -1,7 +1,7 @@
 use crate::{
     render::{
         message::{PolybladeMessage, ProcessMessage},
-        pipeline::{FragUniforms, ModelUniforms, PolyhedronPrimitive, Scene, Texture},
+        pipeline::{FragUniforms, ModelUniforms, PolyhedronPrimitive, Scene},
         state::AppState,
     },
     Instant,
@@ -25,11 +25,11 @@ impl RenderDriver {
         }
     }
 
-    /// Recreates the depth texture when the render target changes size.
+    /// Recreates the render-target-sized textures when the target changes size.
     pub fn resize(&mut self, device: &Device, width: u32, height: u32) {
         if self.size != (width, height) {
             self.size = (width, height);
-            self.scene.depth_texture = Texture::depth_texture(device, (width, height));
+            self.scene.resize(device, (width, height));
         }
     }
 
