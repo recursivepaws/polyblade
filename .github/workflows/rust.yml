@@ -13,13 +13,17 @@ env:
 jobs:
   test:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
+      - uses: DeterminateSystems/determinate-nix-action@v3
+      - uses: DeterminateSystems/flakehub-cache-action@main
       - uses: actions/cache@v4
         with:
           key: ${{ runner.os }}-${{ github.workflow }}-${{ inputs.cache_version }}-rust-${{ github.job }}-${{ hashFiles('**/Cargo.toml', '**/Cargo.lock') }}-${{ github.sha }}
           path: |
-            ~/.cargo/bin/
             ~/.cargo/registry/cache/
             ~/.cargo/registry/index/
             ~/.cargo/git/db/
@@ -27,11 +31,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-${{ github.workflow }}-${{ inputs.cache_version }}-rust-${{ github.job }}-${{ hashFiles('**/Cargo.toml', '**/Cargo.lock') }}-
             ${{ runner.os }}-${{ github.workflow }}-${{ inputs.cache_version }}-rust-${{ github.job }}-
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: cargo-bins/cargo-binstall@main
-      - uses: rui314/setup-mold@v1
-      - run: ld --version
-      - run: mold -run cargo test --workspace
+      - run: nix develop -c cargo test --workspace
 
   format:
     runs-on: ubuntu-latest
@@ -40,11 +40,12 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
+      - uses: DeterminateSystems/determinate-nix-action@v3
+      - uses: DeterminateSystems/flakehub-cache-action@main
       - uses: actions/cache@v4
         with:
           key: ${{ runner.os }}-${{ github.workflow }}-${{ inputs.cache_version }}-rust-${{ github.job }}-${{ hashFiles('**/Cargo.toml', '**/Cargo.lock') }}-${{ github.sha }}
           path: |
-            ~/.cargo/bin/
             ~/.cargo/registry/cache/
             ~/.cargo/registry/index/
             ~/.cargo/git/db/
@@ -52,36 +53,28 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-${{ github.workflow }}-${{ inputs.cache_version }}-rust-${{ github.job }}-${{ hashFiles('**/Cargo.toml', '**/Cargo.lock') }}-
             ${{ runner.os }}-${{ github.workflow }}-${{ inputs.cache_version }}-rust-${{ github.job }}-
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy, rustfmt
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: nightly
-          components: clippy, rustfmt
-      - uses: cargo-bins/cargo-binstall@main
-      - uses: rui314/setup-mold@v1
-      - run: ld --version
       - name: check
-        run: mold -run cargo check --all-targets --all-features --tests
+        run: nix develop -c cargo check --all-targets --all-features --tests
       - name: cargo fmt
-        run: mold -run cargo +nightly fmt --all --check
+        run: nix develop -c cargo fmt --all --check
       - name: cargo clippy
-        run: mold -run cargo clippy --all-targets --all-features --tests -- -D warnings
-      - uses: DeterminateSystems/determinate-nix-action@v3
-      - uses: DeterminateSystems/flakehub-cache-action@main
+        run: nix develop -c cargo clippy --all-targets --all-features --tests -- -D warnings
       - name: dx fmt --check
         run: nix develop -c dx fmt --check
 
   audit:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
+      - uses: DeterminateSystems/determinate-nix-action@v3
+      - uses: DeterminateSystems/flakehub-cache-action@main
       - uses: actions/cache@v4
         with:
           key: ${{ runner.os }}-${{ github.workflow }}-${{ inputs.cache_version }}-rust-${{ github.job }}-${{ hashFiles('**/Cargo.toml', '**/Cargo.lock') }}-${{ github.sha }}
           path: |
-            ~/.cargo/bin/
             ~/.cargo/registry/cache/
             ~/.cargo/registry/index/
             ~/.cargo/git/db/
@@ -89,15 +82,10 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-${{ github.workflow }}-${{ inputs.cache_version }}-rust-${{ github.job }}-${{ hashFiles('**/Cargo.toml', '**/Cargo.lock') }}-
             ${{ runner.os }}-${{ github.workflow }}-${{ inputs.cache_version }}-rust-${{ github.job }}-
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: cargo-bins/cargo-binstall@main
-      - run: cargo binstall -y cargo-deny --locked
-      - uses: rui314/setup-mold@v1
-      - run: ld --version
       - name: bans licenses sources
-        run: mold -run cargo deny check bans licenses sources
+        run: nix develop -c cargo deny check bans licenses sources
       - name: advisories
-        run: mold -run cargo deny check advisories
+        run: nix develop -c cargo deny check advisories
 
   dx-build-web:
     runs-on: ubuntu-latest

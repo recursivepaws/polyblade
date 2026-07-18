@@ -79,9 +79,9 @@
               wasmBindgenCli
               binaryen
               tailwindcss
-              mold
               lld
               nasm
+              cargo-deny
             ]
             ++ webviewLibs;
 
