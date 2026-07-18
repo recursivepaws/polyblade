@@ -35,6 +35,9 @@ impl RenderDriver {
 
     /// Advances physics and the model transform, exactly like the old Tick message.
     pub fn tick(&mut self, now: Instant) {
+        for msg in crate::render::message::drain_messages() {
+            msg.process(&mut self.state);
+        }
         PolybladeMessage::Tick(now).process(&mut self.state);
     }
 

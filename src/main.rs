@@ -1,7 +1,11 @@
 use cfg_if::cfg_if;
 use dioxus::prelude::*;
-use strum::IntoEnumIterator;
-use strum_macros::{Display, EnumIter};
+use polyblade::render::message::{
+    push_message, ConwayMessage, PolybladeMessage, PresetMessage,
+};
+
+mod components;
+use components::MenuBar;
 
 #[cfg(target_arch = "wasm32")]
 use {
@@ -26,15 +30,6 @@ const MAIN_CSS: Asset = asset!("/assets/main.css");
 const TAILWIND_CSS: Asset = asset!("/assets/tailwind.css");
 const ERRORBG: Asset = asset!("/assets/errorbg.svg");
 
-#[derive(Debug, Clone, EnumIter, PartialEq, Display)]
-enum Platonic {
-    Tetrahedron,
-    Hexahedron,
-    Octahedron,
-    Dodecahedron,
-    Icosahedron,
-}
-
 fn main() {
     cfg_if! {
         if #[cfg(target_arch = "wasm32")] {
@@ -57,33 +52,64 @@ fn App() -> Element {
     }
 }
 
-/// Shared navbar component.
+/// Shared navbar component. Also owns keyboard focus so shortcuts work anywhere.
 #[component]
 fn Navbar() -> Element {
     rsx! {
-        div { class: "main-div",
-            div { class: "menu-bar",
-                div { class: "menu-group",
-                    div { class: "menu-btn", "File" }
-                    div { class: "dropdown",
-                        div { class: "item",
-                            "Open"
-                            span { class: "shortcut", "#O" }
-                        }
-
-                        div { class: "item has-sub",
-                            "Recent"
-                            div { class: "submenu",
-                                for preset in Platonic::iter() {
-                                    div { class: "item", "file_{preset}.doc" }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+        div {
+            class: "main-div",
+            tabindex: "0",
+            autofocus: true,
+            onmounted: move |evt| async move {
+                let _ = evt.set_focus(true).await;
+            },
+            onkeydown: handle_key,
+            div { class: "menu-bar", MenuBar {} }
             Outlet::<Route> {}
         }
+    }
+}
+
+/// Ctrl+letter selects a preset; a bare letter triggers a Conway operation.
+/// Case-insensitive.
+fn handle_key(evt: Event<KeyboardData>) {
+    use dioxus::html::Key;
+
+    let Key::Character(ch) = evt.key() else {
+        return;
+    };
+    let ch = ch.to_lowercase();
+
+    let msg = if evt.modifiers().ctrl() {
+        use PresetMessage::*;
+        match ch.as_str() {
+            "t" => Some(PolybladeMessage::Preset(Pyramid(3))),
+            "c" => Some(PolybladeMessage::Preset(Prism(4))),
+            "o" => Some(PolybladeMessage::Preset(Octahedron)),
+            "d" => Some(PolybladeMessage::Preset(Dodecahedron)),
+            "i" => Some(PolybladeMessage::Preset(Icosahedron)),
+            _ => None,
+        }
+    } else {
+        use ConwayMessage::*;
+        match ch.as_str() {
+            "d" => Some(PolybladeMessage::Conway(Dual)),
+            "j" => Some(PolybladeMessage::Conway(Join)),
+            "a" => Some(PolybladeMessage::Conway(Ambo)),
+            "k" => Some(PolybladeMessage::Conway(Kis)),
+            "t" => Some(PolybladeMessage::Conway(Truncate)),
+            "e" => Some(PolybladeMessage::Conway(Expand)),
+            "s" => Some(PolybladeMessage::Conway(Snub)),
+            "b" => Some(PolybladeMessage::Conway(Bevel)),
+            "c" => Some(PolybladeMessage::Conway(Chamfer)),
+            _ => None,
+        }
+    };
+
+    if let Some(msg) = msg {
+        // Keep the browser from opening bookmarks/file dialogs on Ctrl+D/Ctrl+O.
+        evt.prevent_default();
+        push_message(msg);
     }
 }
 

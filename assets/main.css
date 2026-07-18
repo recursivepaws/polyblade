@@ -113,6 +113,15 @@ canvas,
   flex-direction: column;
 }
 
+.main-div:focus {
+  outline: none;
+}
+
+.item input[type="checkbox"] {
+  margin-right: 8px;
+  pointer-events: none;
+}
+
 .canvas-div {
   position: relative;
   flex: 1;

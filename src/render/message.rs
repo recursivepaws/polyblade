@@ -8,6 +8,19 @@ use strum_macros::{Display, EnumIter};
 
 use crate::render::state::{AppState, ColorPickerState, ModelState, RenderState};
 
+/// Messages queued by the UI, drained by `RenderDriver::tick` each frame. A
+/// global is used because the driver lives inside the render loop (wasm) or
+/// Blitz paint source (native), out of reach of Dioxus event handlers.
+static MESSAGE_QUEUE: std::sync::Mutex<Vec<PolybladeMessage>> = std::sync::Mutex::new(Vec::new());
+
+pub fn push_message(msg: PolybladeMessage) {
+    MESSAGE_QUEUE.lock().unwrap().push(msg);
+}
+
+pub fn drain_messages() -> Vec<PolybladeMessage> {
+    std::mem::take(&mut *MESSAGE_QUEUE.lock().unwrap())
+}
+
 #[derive(Debug, Clone, Display)]
 pub enum PolybladeMessage {
     Tick(Instant),
