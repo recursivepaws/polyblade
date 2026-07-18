@@ -7,11 +7,11 @@ use strum::IntoEnumIterator;
 /// The platonic solids expressible as presets, paired with their keyboard shortcuts.
 fn platonic_items() -> Vec<(PresetMessage, &'static str)> {
     vec![
-        (PresetMessage::Pyramid(3), "Ctrl+T"),
-        (PresetMessage::Prism(4), "Ctrl+C"),
-        (PresetMessage::Octahedron, "Ctrl+O"),
-        (PresetMessage::Dodecahedron, "Ctrl+D"),
-        (PresetMessage::Icosahedron, "Ctrl+I"),
+        (PresetMessage::Pyramid(3), "Shift+T"),
+        (PresetMessage::Prism(4), "Shift+C"),
+        (PresetMessage::Octahedron, "Shift+O"),
+        (PresetMessage::Dodecahedron, "Shift+D"),
+        (PresetMessage::Icosahedron, "Shift+I"),
     ]
 }
 

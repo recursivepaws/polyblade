@@ -70,7 +70,7 @@ fn Navbar() -> Element {
     }
 }
 
-/// Ctrl+letter selects a preset; a bare letter triggers a Conway operation.
+/// Shift+letter selects a preset; a bare letter triggers a Conway operation.
 /// Case-insensitive.
 fn handle_key(evt: Event<KeyboardData>) {
     use dioxus::html::Key;
@@ -80,7 +80,7 @@ fn handle_key(evt: Event<KeyboardData>) {
     };
     let ch = ch.to_lowercase();
 
-    let msg = if evt.modifiers().ctrl() {
+    let msg = if evt.modifiers().shift() {
         use PresetMessage::*;
         match ch.as_str() {
             "t" => Some(PolybladeMessage::Preset(Pyramid(3))),
@@ -107,7 +107,6 @@ fn handle_key(evt: Event<KeyboardData>) {
     };
 
     if let Some(msg) = msg {
-        // Keep the browser from opening bookmarks/file dialogs on Ctrl+D/Ctrl+O.
         evt.prevent_default();
         push_message(msg);
     }
