@@ -1,5 +1,3 @@
-use iced::{widget::shader::wgpu, Size};
-
 pub struct Texture {
     pub view: wgpu::TextureView,
 }
@@ -7,10 +5,10 @@ pub struct Texture {
 impl Texture {
     pub const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth24Plus;
 
-    pub fn depth_texture(device: &wgpu::Device, target_size: &Size<u32>) -> Self {
+    pub fn depth_texture(device: &wgpu::Device, target_size: (u32, u32)) -> Self {
         let size = wgpu::Extent3d {
-            width: target_size.width.max(1),
-            height: target_size.height.max(1),
+            width: target_size.0.max(1),
+            height: target_size.1.max(1),
             depth_or_array_layers: 1,
         };
         let desc = wgpu::TextureDescriptor {

@@ -1,15 +1,12 @@
-use bytemuck::{Pod, Zeroable};
-use ultraviolet::Vec3;
 use log::info;
 use wgpu::DeviceDescriptor;
 
 #[cfg(target_arch = "wasm32")]
-use {wgpu::SurfaceTarget::Canvas};
+use wgpu::SurfaceTarget::Canvas;
 
 use wgpu::{
-    vertex_attr_array, BufferAddress, Device, Instance, PowerPreference, Queue,
-    RequestAdapterOptions, Surface, SurfaceConfiguration, SurfaceTarget, VertexAttribute,
-    VertexBufferLayout, VertexStepMode,
+    Device, Instance, PowerPreference, Queue, RequestAdapterOptions, Surface,
+    SurfaceConfiguration, SurfaceTarget, TextureFormat,
 };
 
 pub struct WGPUInstance<'window> {
@@ -17,6 +14,9 @@ pub struct WGPUInstance<'window> {
     pub config: SurfaceConfiguration,
     pub device: Device,
     pub queue: Queue,
+    /// Format render pipelines and per-frame views should target: the surface
+    /// format itself when it's sRGB, otherwise an sRGB view format of it.
+    pub render_format: TextureFormat,
 }
 
 impl<'window> WGPUInstance<'window> {
@@ -60,7 +60,22 @@ impl<'window> WGPUInstance<'window> {
             .unwrap();
         info!("wgpu device and queue created.");
 
-        let config = surface.get_default_config(&adapter, width, height).unwrap();
+        let mut config = surface.get_default_config(&adapter, width, height).unwrap();
+
+        // The palette colors are converted to linear space on upload, so the
+        // render target must be sRGB for output to re-encode correctly.
+        let render_format = if config.format.is_srgb() {
+            config.format
+        } else {
+            let srgb = config.format.add_srgb_suffix();
+            if srgb == config.format {
+                // No sRGB variant exists; render in the surface format as-is.
+                config.format
+            } else {
+                config.view_formats.push(srgb);
+                srgb
+            }
+        };
 
         surface.configure(&device, &config);
 
@@ -69,28 +84,7 @@ impl<'window> WGPUInstance<'window> {
             config,
             device,
             queue,
-        }
-    }
-}
-
-#[repr(C)]
-#[derive(Pod, Zeroable, Copy, Clone, Debug)]
-pub struct Vertex {
-    pub position: Vec3,
-    pub color: Vec3,
-}
-
-impl Vertex {
-    const ATTRIBS: [VertexAttribute; 2] = vertex_attr_array![
-        0 => Float32x3,
-        1 => Float32x3
-    ];
-
-    pub fn desc() -> VertexBufferLayout<'static> {
-        VertexBufferLayout {
-            array_stride: size_of::<Self>() as BufferAddress,
-            step_mode: VertexStepMode::Vertex,
-            attributes: &Self::ATTRIBS,
+            render_format,
         }
     }
 }

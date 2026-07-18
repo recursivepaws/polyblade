@@ -1,4 +1,3 @@
-use iced::Size;
 use ultraviolet::{Mat4, Vec3, Vec4};
 
 #[derive(Copy, Debug, Clone)]
@@ -32,8 +31,8 @@ pub const OPENGL_TO_WGPU_MATRIX: Mat4 = Mat4::new(
 );
 
 impl Camera {
-    pub fn build_view_proj_mat(&self, bounds: Size<f32>) -> Mat4 {
-        let aspect_ratio = bounds.width / bounds.height;
+    pub fn build_view_proj_mat(&self, width: f32, height: f32) -> Mat4 {
+        let aspect_ratio = width / height;
         let view = Mat4::look_at(self.eye, self.target, self.up);
         let h = f32::cos(0.5 * self.fov_y) / f32::sin(0.5 * self.fov_y);
         let w = h / aspect_ratio;

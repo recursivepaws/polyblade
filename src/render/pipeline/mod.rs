@@ -2,19 +2,12 @@ mod buffer;
 mod polyhedron_primitive;
 mod texture;
 
-use buffer::Buffer;
-use iced::{
-    widget::shader::wgpu::{self, RenderPassDepthStencilAttachment},
-    Size,
-};
-use iced_wgpu::wgpu::{DepthBiasState, StencilState};
-use iced_winit::core::Color;
+use wgpu::{DepthBiasState, RenderPassDepthStencilAttachment, StencilState};
 
 pub use buffer::*;
 pub use polyhedron_primitive::*;
 pub use texture::Texture;
 
-unsafe impl Send for Scene {}
 pub struct Scene {
     pipeline: wgpu::RenderPipeline,
     pub moment_buf: Buffer,
@@ -29,7 +22,7 @@ impl Scene {
     pub fn new(
         device: &wgpu::Device,
         texture_format: wgpu::TextureFormat,
-        size: &Size<u32>,
+        size: (u32, u32),
     ) -> Scene {
         let pipeline = Self::build_pipeline(device, texture_format);
         // Moment and shape
@@ -70,23 +63,16 @@ impl Scene {
         &'a self,
         target: &'a wgpu::TextureView,
         encoder: &'a mut wgpu::CommandEncoder,
-        background_color: Color,
+        background_color: wgpu::Color,
     ) -> wgpu::RenderPass<'a> {
         encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: None,
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                 view: target,
+                depth_slice: None,
                 resolve_target: None,
                 ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear({
-                        let [r, g, b, a] = background_color.into_linear();
-                        wgpu::Color {
-                            r: r as f64,
-                            g: g as f64,
-                            b: b as f64,
-                            a: a as f64,
-                        }
-                    }),
+                    load: wgpu::LoadOp::Clear(background_color),
                     store: wgpu::StoreOp::Store,
                 },
             })],
@@ -104,7 +90,7 @@ impl Scene {
         })
     }
 
-    pub fn draw<'a>(&'a self, starting_vertex: u32, pass: &mut wgpu::RenderPass<'a>) {
+    pub fn draw(&self, starting_vertex: u32, pass: &mut wgpu::RenderPass<'_>) {
         pass.set_pipeline(&self.pipeline);
         pass.set_bind_group(0, &self.uniform_group, &[]);
         pass.set_vertex_buffer(0, self.moment_buf.raw_slice());
@@ -152,7 +138,8 @@ impl Scene {
             layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
                 module,
-                entry_point: "vs_main",
+                entry_point: Some("vs_main"),
+                compilation_options: Default::default(),
                 buffers: &[
                     wgpu::VertexBufferLayout {
                         array_stride: std::mem::size_of::<MomentVertex>() as wgpu::BufferAddress,
@@ -178,7 +165,8 @@ impl Scene {
             },
             fragment: Some(wgpu::FragmentState {
                 module,
-                entry_point: "fs_main",
+                entry_point: Some("fs_main"),
+                compilation_options: Default::default(),
                 targets: &[Some(wgpu::ColorTargetState {
                     format: texture_format,
                     blend: Some(wgpu::BlendState::ALPHA_BLENDING),
@@ -196,6 +184,7 @@ impl Scene {
             }),
             multisample: wgpu::MultisampleState::default(),
             multiview: None,
+            cache: None,
         })
     }
 }

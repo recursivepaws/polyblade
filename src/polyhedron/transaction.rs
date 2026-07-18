@@ -1,5 +1,5 @@
 use crate::render::message::ConwayMessage;
-use std::time::Instant;
+use crate::Instant;
 
 use super::VertexId;
 

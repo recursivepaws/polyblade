@@ -1,5 +1,4 @@
 use crate::render::color::RGBA;
-use iced::widget::shader::wgpu;
 
 #[derive(Debug, Clone)]
 pub struct Palette {

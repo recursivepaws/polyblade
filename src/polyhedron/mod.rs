@@ -10,19 +10,13 @@ pub use transaction::*;
 #[cfg(test)]
 mod test;
 
-use std::{
-    collections::HashMap,
-    time::{Duration, Instant},
-};
+use std::{collections::HashMap, time::Duration};
 
 use crate::render::{
     message::{ConwayMessage, PresetMessage},
     pipeline::{MomentVertex, ShapeVertex},
 };
-use iced_widget::{
-    svg,
-    svg::{Catalog, Handle},
-};
+use crate::Instant;
 use ultraviolet::{Vec3, Vec4};
 
 pub type VertexId = usize;
@@ -181,7 +175,6 @@ impl Polyhedron {
                 }
                 None => {}
             };
-            self.shape.compute_graph_svg();
         }
     }
 
@@ -283,9 +276,6 @@ impl Polyhedron {
             .collect()
     }
 
-    pub fn svg<'a, T: Catalog>(&self) -> iced_widget::Svg<'a, T> {
-        svg(Handle::from_memory(self.shape.svg.clone()))
-    }
     // fn face_positions(&self, face_index: usize) -> Vec<Vec3> {
     //     self.shape.cycles[face_index]
     //         .iter()

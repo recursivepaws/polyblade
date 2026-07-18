@@ -4,7 +4,7 @@ use PresetMessage::*;
 impl Polyhedron {
     pub fn preset(preset: &PresetMessage) -> Polyhedron {
         use PresetMessage::*;
-        let mut poly = match preset {
+        let poly = match preset {
             Octahedron => Self::octahedron(),
             Dodecahedron => todo!(),
             Icosahedron => Self::icosahedron(),
@@ -26,7 +26,6 @@ impl Polyhedron {
                 }
             }
         };
-        poly.shape.compute_graph_svg();
         poly
     }
 

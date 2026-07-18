@@ -1,6 +1,5 @@
 mod conway;
 mod platonic;
-mod svg;
 
 #[cfg(test)]
 mod test;

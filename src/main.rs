@@ -1,15 +1,13 @@
 use cfg_if::cfg_if;
 use dioxus::prelude::*;
-use polyblade::{graphics::Vertex, renderer::Triangle};
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
-use ultraviolet::Vec3;
 
 #[cfg(target_arch = "wasm32")]
 use {
     log::info,
-    polyblade::{graphics::WGPUInstance, renderer::Renderer},
-    wgpu::SurfaceTarget::Canvas,
+    polyblade::{graphics::WGPUInstance, render::driver::RenderDriver, Instant},
+    wgpu::{SurfaceTarget::Canvas, TextureViewDescriptor},
 };
 
 #[cfg(all(not(target_arch = "wasm32"), feature = "native"))]
@@ -97,38 +95,32 @@ fn Home() -> Element {
     }
 }
 
-fn triangle_model() -> Triangle {
-    vec![
-        Vertex {
-            position: Vec3::new(0.0, 0.5, 0.0),
-            color: Vec3::new(1.0, 0.0, 0.0),
-        },
-        Vertex {
-            position: Vec3::new(-0.5, -0.5, 0.0),
-            color: Vec3::new(0.0, 1.0, 0.0),
-        },
-        Vertex {
-            position: Vec3::new(0.5, -0.5, 0.0),
-            color: Vec3::new(0.0, 0.0, 1.0),
-        },
-    ]
-}
-
 #[component]
 pub fn SpinningCube() -> Element {
     cfg_if! {
         if #[cfg(target_arch = "wasm32")] {
-            let triangle = triangle_model();
-
             use_effect(move || {
                 if let Some(el) = polyblade::get_canvas(&"wgpu-canvas") {
-                    let tri = triangle.clone();
-
                     spawn(async move {
                         let gpu = WGPUInstance::new(Canvas(el)).await;
                         info!("wgpu_instance created");
-                        let renderer = Renderer::new(&gpu.device, gpu.config.format, &tri);
-                        renderer.render_surface(&gpu);
+                        let (width, height) = (gpu.config.width, gpu.config.height);
+                        let mut driver =
+                            RenderDriver::new(&gpu.device, gpu.render_format, width, height);
+                        loop {
+                            driver.tick(Instant::now());
+                            let frame = gpu
+                                .surface
+                                .get_current_texture()
+                                .expect("failed to acquire frame");
+                            let view = frame.texture.create_view(&TextureViewDescriptor {
+                                format: Some(gpu.render_format),
+                                ..Default::default()
+                            });
+                            driver.draw(&gpu.device, &gpu.queue, &view);
+                            frame.present();
+                            polyblade::next_animation_frame().await;
+                        }
                     });
                 } else {
                     info!("failed to find canvas.")
@@ -147,13 +139,28 @@ pub fn SpinningCube() -> Element {
                 }
             }
         } else if #[cfg(feature = "native")] {
-            let paint_id = dioxus_native::use_wgpu(move || {
-                PolybladePaintSource::new(triangle_model())
+            let paint_id = dioxus_native::use_wgpu(PolybladePaintSource::new);
+
+            // Blitz only repaints when the DOM changes, so tick a dummy
+            // attribute at ~60fps to keep the animation running. Stopgap until
+            // a proper redraw mechanism is exposed for custom paint sources.
+            let mut frame = use_signal(|| 0u64);
+            use_future(move || async move {
+                loop {
+                    tokio::time::sleep(std::time::Duration::from_millis(16)).await;
+                    frame += 1;
+                }
             });
 
             rsx! {
                 div { class: "canvas-div",
-                    canvas { id: "wgpu-canvas", "src": paint_id, width: 1000, height: 1000 }
+                    canvas {
+                        id: "wgpu-canvas",
+                        "src": paint_id,
+                        "data-frame": "{frame}",
+                        width: 1000,
+                        height: 1000,
+                    }
                     img {
                         id: "error-background",
                         src: "{ERRORBG}",

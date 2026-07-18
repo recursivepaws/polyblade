@@ -3,7 +3,6 @@ use std::{
     num::ParseIntError,
 };
 
-use iced::widget::shader::wgpu;
 use ultraviolet::Vec4;
 
 #[derive(Debug, Default)]
@@ -137,32 +136,6 @@ impl From<HSL> for RGBA {
             percent_to_byte(hue_to_rgb(p, q, h - 1.0 / 3.0)),
             u8::MAX,
         )
-    }
-}
-
-impl From<iced::Color> for RGBA {
-    fn from(value: iced::Color) -> Self {
-        Self {
-            r: (value.r * 255.0) as u8,
-            g: (value.g * 255.0) as u8,
-            b: (value.b * 255.0) as u8,
-            a: (value.a * 255.0) as u8,
-        }
-    }
-}
-impl From<RGBA> for iced::Color {
-    fn from(value: RGBA) -> Self {
-        Self {
-            r: value.r as f32 / 255.0,
-            g: value.g as f32 / 255.0,
-            b: value.b as f32 / 255.0,
-            a: value.a as f32 / 255.0,
-        }
-    }
-}
-impl From<RGBA> for iced::Background {
-    fn from(value: RGBA) -> Self {
-        iced::Color::from(value).into()
     }
 }
 

@@ -1,4 +1,4 @@
-use crate::renderer::{Renderer, Triangle};
+use crate::{render::driver::RenderDriver, Instant};
 use dioxus_native::{CustomPaintCtx, CustomPaintSource, DeviceHandle, TextureHandle};
 use wgpu::{
     Device, Extent3d, Queue, Texture, TextureDescriptor, TextureDimension, TextureFormat,
@@ -6,7 +6,6 @@ use wgpu::{
 };
 
 pub struct PolybladePaintSource {
-    triangle: Triangle,
     state: State,
 }
 
@@ -23,17 +22,22 @@ struct TextureAndHandle {
 struct ActiveRenderer {
     device: Device,
     queue: Queue,
-    renderer: Renderer,
+    driver: RenderDriver,
     displayed_texture: Option<TextureAndHandle>,
     next_texture: Option<TextureAndHandle>,
 }
 
 impl PolybladePaintSource {
-    pub fn new(triangle: Triangle) -> Self {
+    pub fn new() -> Self {
         Self {
-            triangle,
             state: State::Suspended,
         }
+    }
+}
+
+impl Default for PolybladePaintSource {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -41,12 +45,13 @@ impl CustomPaintSource for PolybladePaintSource {
     fn resume(&mut self, device_handle: &DeviceHandle) {
         let device = device_handle.device.clone();
         let queue = device_handle.queue.clone();
-        // Rgba8Unorm is the format Blitz's compositor expects for registered textures.
-        let renderer = Renderer::new(&device, TextureFormat::Rgba8Unorm, &self.triangle);
+        // Blitz's compositor expects Rgba8Unorm textures; we render through an
+        // sRGB view of them so shader output is gamma-encoded correctly.
+        let driver = RenderDriver::new(&device, TextureFormat::Rgba8UnormSrgb, 1, 1);
         self.state = State::Active(Box::new(ActiveRenderer {
             device,
             queue,
-            renderer,
+            driver,
             displayed_texture: None,
             next_texture: None,
         }));
@@ -96,12 +101,15 @@ impl ActiveRenderer {
             }
         };
 
-        let view = texture_and_handle
-            .texture
-            .create_view(&TextureViewDescriptor::default());
+        let view = texture_and_handle.texture.create_view(&TextureViewDescriptor {
+            format: Some(TextureFormat::Rgba8UnormSrgb),
+            ..Default::default()
+        });
         let handle = texture_and_handle.handle.clone();
 
-        self.renderer.render_to_view(&self.device, &self.queue, &view);
+        self.driver.resize(&self.device, width, height);
+        self.driver.tick(Instant::now());
+        self.driver.draw(&self.device, &self.queue, &view);
 
         std::mem::swap(&mut self.next_texture, &mut self.displayed_texture);
         Some(handle)
@@ -123,6 +131,6 @@ fn create_texture(device: &Device, width: u32, height: u32) -> Texture {
         usage: TextureUsages::RENDER_ATTACHMENT
             | TextureUsages::TEXTURE_BINDING
             | TextureUsages::COPY_SRC,
-        view_formats: &[],
+        view_formats: &[TextureFormat::Rgba8UnormSrgb],
     })
 }
