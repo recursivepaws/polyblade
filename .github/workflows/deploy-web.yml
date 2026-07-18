@@ -7,13 +7,9 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/determinate-nix-action@v3
-      - uses: DeterminateSystems/flakehub-cache-action@main
       - uses: actions/cache@v4
         with:
           key: ${{ runner.os }}-deploy-web-rust-${{ hashFiles('**/Cargo.toml', '**/Cargo.lock') }}-${{ github.sha }}
