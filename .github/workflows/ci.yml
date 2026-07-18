@@ -9,8 +9,131 @@ on:
       - main
   workflow_dispatch: {}
 
+env:
+  CARGO_TERM_COLOR: always
+
 jobs:
-  rust:
-    uses: ./.github/workflows/rust.yml
-    with:
-      cache_version: v2
+  version-bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - if: github.event_name == 'pull_request'
+        run: git fetch origin ${{ github.base_ref }} --depth=1
+      - name: ensure Cargo.toml version was bumped
+        if: github.event_name == 'pull_request'
+        run: |
+          set -euo pipefail
+          current="$(grep -m1 '^version' Cargo.toml | sed -E 's/version = "(.*)"/\1/')"
+          base="$(git show origin/${{ github.base_ref }}:Cargo.toml | grep -m1 '^version' | sed -E 's/version = "(.*)"/\1/')"
+          echo "PR version:            $current"
+          echo "${{ github.base_ref }} version: $base"
+          if [ "$current" == "$base" ]; then
+            echo "::error::Cargo.toml version must be bumped before merging into ${{ github.base_ref }} (currently $current)."
+            exit 1
+          fi
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/determinate-nix-action@v3
+      - uses: actions/cache@v4
+        with:
+          key: ${{ runner.os }}-${{ github.workflow }}-v2-rust-${{ github.job }}-${{ hashFiles('**/Cargo.toml', '**/Cargo.lock') }}-${{ github.sha }}
+          path: |
+            ~/.cargo/registry/cache/
+            ~/.cargo/registry/index/
+            ~/.cargo/git/db/
+            target/
+          restore-keys: |
+            ${{ runner.os }}-${{ github.workflow }}-v2-rust-${{ github.job }}-${{ hashFiles('**/Cargo.toml', '**/Cargo.lock') }}-
+            ${{ runner.os }}-${{ github.workflow }}-v2-rust-${{ github.job }}-
+      - run: nix develop -c cargo test --workspace
+
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/determinate-nix-action@v3
+      - uses: actions/cache@v4
+        with:
+          key: ${{ runner.os }}-${{ github.workflow }}-v2-rust-${{ github.job }}-${{ hashFiles('**/Cargo.toml', '**/Cargo.lock') }}-${{ github.sha }}
+          path: |
+            ~/.cargo/registry/cache/
+            ~/.cargo/registry/index/
+            ~/.cargo/git/db/
+            target/
+          restore-keys: |
+            ${{ runner.os }}-${{ github.workflow }}-v2-rust-${{ github.job }}-${{ hashFiles('**/Cargo.toml', '**/Cargo.lock') }}-
+            ${{ runner.os }}-${{ github.workflow }}-v2-rust-${{ github.job }}-
+      - name: check
+        run: nix develop -c cargo check --all-targets --all-features --tests
+      - name: cargo fmt
+        run: nix develop -c cargo fmt --all --check
+      - name: cargo clippy
+        run: nix develop -c cargo clippy --all-targets --all-features --tests -- -D warnings
+      - name: dx fmt --check
+        run: nix develop -c dx fmt --check
+
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/determinate-nix-action@v3
+      - uses: actions/cache@v4
+        with:
+          key: ${{ runner.os }}-${{ github.workflow }}-v2-rust-${{ github.job }}-${{ hashFiles('**/Cargo.toml', '**/Cargo.lock') }}-${{ github.sha }}
+          path: |
+            ~/.cargo/registry/cache/
+            ~/.cargo/registry/index/
+            ~/.cargo/git/db/
+            target/
+          restore-keys: |
+            ${{ runner.os }}-${{ github.workflow }}-v2-rust-${{ github.job }}-${{ hashFiles('**/Cargo.toml', '**/Cargo.lock') }}-
+            ${{ runner.os }}-${{ github.workflow }}-v2-rust-${{ github.job }}-
+      - name: bans licenses sources
+        run: nix develop -c cargo deny check bans licenses sources
+      - name: advisories
+        run: nix develop -c cargo deny check advisories
+
+  dx-build-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/determinate-nix-action@v3
+      - uses: actions/cache@v4
+        with:
+          key: ${{ runner.os }}-${{ github.workflow }}-v2-rust-${{ github.job }}-${{ hashFiles('**/Cargo.toml', '**/Cargo.lock') }}-${{ github.sha }}
+          path: |
+            ~/.cargo/registry/cache/
+            ~/.cargo/registry/index/
+            ~/.cargo/git/db/
+            target/
+          restore-keys: |
+            ${{ runner.os }}-${{ github.workflow }}-v2-rust-${{ github.job }}-${{ hashFiles('**/Cargo.toml', '**/Cargo.lock') }}-
+            ${{ runner.os }}-${{ github.workflow }}-v2-rust-${{ github.job }}-
+      - name: regenerate tailwind CSS
+        run: nix develop -c tailwindcss -i ./tailwind.css -o ./assets/tailwind.css --minify
+      - name: dx build --platform web
+        run: nix develop -c dx build --platform web
+
+  dx-build-native:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/determinate-nix-action@v3
+      - uses: actions/cache@v4
+        with:
+          key: ${{ runner.os }}-${{ github.workflow }}-v2-rust-${{ github.job }}-${{ hashFiles('**/Cargo.toml', '**/Cargo.lock') }}-${{ github.sha }}
+          path: |
+            ~/.cargo/registry/cache/
+            ~/.cargo/registry/index/
+            ~/.cargo/git/db/
+            target/
+          restore-keys: |
+            ${{ runner.os }}-${{ github.workflow }}-v2-rust-${{ github.job }}-${{ hashFiles('**/Cargo.toml', '**/Cargo.lock') }}-
+            ${{ runner.os }}-${{ github.workflow }}-v2-rust-${{ github.job }}-
+      - name: regenerate tailwind CSS
+        run: nix develop -c tailwindcss -i ./tailwind.css -o ./assets/tailwind.css --minify
+      - name: dx build --platform linux --renderer native
+        run: nix develop -c dx build --platform linux --renderer native
