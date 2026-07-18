@@ -2,7 +2,7 @@
     <h1>
         <img width="15%" src="./assets/logo.png"/>
         Polyblade
-        <a href="https://vera.lgbt/software/polyblade_live/index.html">
+        <a href="https://polyblade.app">
             <img src="https://img.shields.io/website?url=https%3A//polyblade.app&label=demo&logo=webgpu&logoSize=auto&style=for-the-badge"/>
         </a>
         <a href="https://github.com/organizedgrime/polyblade/actions/workflows/ci.yml">
