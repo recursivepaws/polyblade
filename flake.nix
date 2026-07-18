@@ -104,9 +104,13 @@
             export CARGO_TARGET_DIR="$PWD/target"
 
             ${pkgs.lib.optionalString pkgs.stdenv.isLinux ''
-              mkdir -p "$HOME/.dx/tools"
-              if [ ! -e "$HOME/.dx/tools/linuxdeploy-x86_64.AppImage" ]; then
-                install -m 0755 ${linuxdeployAppImage} "$HOME/.dx/tools/linuxdeploy-x86_64.AppImage"
+              # dx resolves its data dir per-platform (XDG data dir on Linux, unless
+              # DX_HOME is set) - pin it explicitly so the linuxdeploy seed below
+              # always lands where `dx bundle` will actually look for it.
+              export DX_HOME="$HOME/.dx"
+              mkdir -p "$DX_HOME/tools"
+              if [ ! -e "$DX_HOME/tools/linuxdeploy-x86_64.AppImage" ]; then
+                install -m 0755 ${linuxdeployAppImage} "$DX_HOME/tools/linuxdeploy-x86_64.AppImage"
               fi
             ''}
 
