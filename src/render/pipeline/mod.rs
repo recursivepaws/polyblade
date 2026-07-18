@@ -2,19 +2,12 @@ mod buffer;
 mod polyhedron_primitive;
 mod texture;
 
-use buffer::Buffer;
-use iced::{
-    widget::shader::wgpu::{self, RenderPassDepthStencilAttachment},
-    Size,
-};
-use iced_wgpu::wgpu::{DepthBiasState, StencilState};
-use iced_winit::core::Color;
+use wgpu::{DepthBiasState, RenderPassDepthStencilAttachment, StencilState};
 
 pub use buffer::*;
 pub use polyhedron_primitive::*;
 pub use texture::Texture;
 
-unsafe impl Send for Scene {}
 pub struct Scene {
     pipeline: wgpu::RenderPipeline,
     pub moment_buf: Buffer,
@@ -22,14 +15,16 @@ pub struct Scene {
     pub model_buf: Buffer,
     pub frag_buf: Buffer,
     uniform_group: wgpu::BindGroup,
-    pub depth_texture: Texture,
+    texture_format: wgpu::TextureFormat,
+    depth_texture: Texture,
+    msaa_texture: Texture,
 }
 
 impl Scene {
     pub fn new(
         device: &wgpu::Device,
         texture_format: wgpu::TextureFormat,
-        size: &Size<u32>,
+        size: (u32, u32),
     ) -> Scene {
         let pipeline = Self::build_pipeline(device, texture_format);
         // Moment and shape
@@ -54,6 +49,7 @@ impl Scene {
             ],
         });
         let depth_texture = Texture::depth_texture(device, size);
+        let msaa_texture = Texture::msaa_texture(device, texture_format, size);
 
         Scene {
             pipeline,
@@ -62,32 +58,34 @@ impl Scene {
             model_buf,
             frag_buf,
             uniform_group,
+            texture_format,
             depth_texture,
+            msaa_texture,
         }
+    }
+
+    /// Recreates the render-target-sized attachments (depth + MSAA color).
+    pub fn resize(&mut self, device: &wgpu::Device, size: (u32, u32)) {
+        self.depth_texture = Texture::depth_texture(device, size);
+        self.msaa_texture = Texture::msaa_texture(device, self.texture_format, size);
     }
 
     pub fn clear<'a>(
         &'a self,
         target: &'a wgpu::TextureView,
         encoder: &'a mut wgpu::CommandEncoder,
-        background_color: Color,
+        background_color: wgpu::Color,
     ) -> wgpu::RenderPass<'a> {
         encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: None,
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: target,
-                resolve_target: None,
+                view: &self.msaa_texture.view,
+                depth_slice: None,
+                resolve_target: Some(target),
                 ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear({
-                        let [r, g, b, a] = background_color.into_linear();
-                        wgpu::Color {
-                            r: r as f64,
-                            g: g as f64,
-                            b: b as f64,
-                            a: a as f64,
-                        }
-                    }),
-                    store: wgpu::StoreOp::Store,
+                    load: wgpu::LoadOp::Clear(background_color),
+                    // Only the resolved output is needed after the pass.
+                    store: wgpu::StoreOp::Discard,
                 },
             })],
             depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
@@ -104,7 +102,7 @@ impl Scene {
         })
     }
 
-    pub fn draw<'a>(&'a self, starting_vertex: u32, pass: &mut wgpu::RenderPass<'a>) {
+    pub fn draw(&self, starting_vertex: u32, pass: &mut wgpu::RenderPass<'_>) {
         pass.set_pipeline(&self.pipeline);
         pass.set_bind_group(0, &self.uniform_group, &[]);
         pass.set_vertex_buffer(0, self.moment_buf.raw_slice());
@@ -152,7 +150,8 @@ impl Scene {
             layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
                 module,
-                entry_point: "vs_main",
+                entry_point: Some("vs_main"),
+                compilation_options: Default::default(),
                 buffers: &[
                     wgpu::VertexBufferLayout {
                         array_stride: std::mem::size_of::<MomentVertex>() as wgpu::BufferAddress,
@@ -178,7 +177,8 @@ impl Scene {
             },
             fragment: Some(wgpu::FragmentState {
                 module,
-                entry_point: "fs_main",
+                entry_point: Some("fs_main"),
+                compilation_options: Default::default(),
                 targets: &[Some(wgpu::ColorTargetState {
                     format: texture_format,
                     blend: Some(wgpu::BlendState::ALPHA_BLENDING),
@@ -194,8 +194,12 @@ impl Scene {
                 stencil: StencilState::default(),
                 bias: DepthBiasState::default(),
             }),
-            multisample: wgpu::MultisampleState::default(),
+            multisample: wgpu::MultisampleState {
+                count: Texture::SAMPLE_COUNT,
+                ..Default::default()
+            },
             multiview: None,
+            cache: None,
         })
     }
 }

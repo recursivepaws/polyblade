@@ -21,8 +21,6 @@ pub(super) struct Shape {
     pub cycles: Cycles,
     /// Faces / chordless cycles
     pub springs: Vec<[VertexId; 2]>,
-    /// SVG string of graph representation
-    pub svg: Vec<u8>,
 }
 
 impl PartialEq for Shape {
@@ -67,10 +65,6 @@ impl Shape {
         self.cycles = Cycles::from(&self.distance);
         // Find and save springs
         self.springs = self.distance.springs();
-    }
-
-    pub fn compute_graph_svg(&mut self) {
-        self.svg = self.distance.svg().unwrap_or_default();
     }
 
     pub fn release(&mut self, edges: &[[VertexId; 2]]) {

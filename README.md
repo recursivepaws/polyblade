@@ -5,10 +5,10 @@
         <a href="https://vera.lgbt/software/polyblade_live/index.html">
             <img src="https://img.shields.io/website?url=https%3A//vera.lgbt/software/polyblade_live/index.html&label=demo&logo=webgl&logoSize=auto&style=for-the-badge"/>
         </a>
-        <a href="https://github.com/organizedgrime/polyblade/actions/workflows/ci.yml"> 
+        <a href="https://github.com/organizedgrime/polyblade/actions/workflows/ci.yml">
             <img src="https://img.shields.io/github/actions/workflow/status/organizedgrime/polyblade/ci.yml?style=for-the-badge&label=CI%20Status"/>
         </a>
-        <a href="LICENSE"> 
+        <a href="LICENSE">
             <img src="https://img.shields.io/badge/license-APGL3-blue.svg?style=for-the-badge"/>
         </a>
     </h1>
@@ -20,20 +20,20 @@
     <p>
         Polyblade makes it easy to visualize and interact with Polyhedra. I believe that the relationships between both primitive and complex polytopes can be more intuitively understood when experienced visually, and this software aims to demonstrate that.
         <br/><br/>
-        In particular, emphasis has been placed on making smooth animations for the transitions represented by <a href="https://en.wikipedia.org/wiki/Conway_polyhedron_notation">Conway Polyhedron Notation</a>. 
+        In particular, emphasis has been placed on making smooth animations for the transitions represented by <a href="https://en.wikipedia.org/wiki/Conway_polyhedron_notation">Conway Polyhedron Notation</a>.
     </p>
     <p>
         <span><img src="./assets/demo.gif" align="right" alt="animated" width="20%" /></span>
-        Polyblade runs on <a href="https://github.com/gfx-rs/wgpu">WGPU</a> and <a href="https://github.com/iced-rs/iced">Iced</a>.
+        Polyblade runs on <a href="https://github.com/gfx-rs/wgpu">WGPU</a> and <a href="https://github.com/DiouxsLabs/dioxus">Dioxus</a>.
         <br/>
-        Using the PST distance algorithm for efficient all pairs shortest paths in the unweighted undirected graphs represented by polyhedra, none of the vertex position data is deterministic. Instead, this distance matrix is used to create spring forces between every node pair $v_i, v_j$ where $v_n \in G$. Proportional to their distance in the graph structure $G$, the springs inflate the polyhedron to proportional size, allowing us to visualize these strucutres even when they break convexity. 
+        Using the PST distance algorithm for efficient all pairs shortest paths in the unweighted undirected graphs represented by polyhedra, none of the vertex position data is deterministic. Instead, this distance matrix is used to create spring forces between every node pair $v_i, v_j$ where $v_n \in G$. Proportional to their distance in the graph structure $G$, the springs inflate the polyhedron to proportional size, allowing us to visualize these strucutres even when they break convexity.
         <br/>
     </p>
 </div>
 
 ## WARNING
-This software is currently broken. Use the release published on crates.io or 0.1.0 while I fix it, which can be installed using the method below. 
-The main branch is not as functional as it once was, but this will be remedied soon post-refactor. 
+This software is currently broken. Use the release published on crates.io or 0.1.0 while I fix it, which can be installed using the method below.
+The main branch is not as functional as it once was, but this will be remedied soon post-refactor.
 
 ## Installation
 ```cargo install polyblade```
@@ -42,8 +42,8 @@ Note that the `webgl` demo is available [here](https://vera.lgbt/software/polybl
 
 ### Build from source
 To run this software, simply clone the repository and use `cargo run --release`.
-For the `webgl` build, run `trunk serve --release`. 
-        
+For the `webgl` build, run `trunk serve --release`.
+
 #### Conway Roadmap
 - [x] Ambo
 - [x] Kis

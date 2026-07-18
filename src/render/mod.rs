@@ -1,11 +1,7 @@
-mod app;
-mod camera;
+pub mod camera;
 pub mod color;
-mod controls;
-mod menu;
-pub(crate) mod message;
-mod palette;
-pub(crate) mod pipeline;
-mod polydex;
-mod state;
-pub use app::{App, Graphics};
+pub mod driver;
+pub mod message;
+pub mod palette;
+pub mod pipeline;
+pub mod state;

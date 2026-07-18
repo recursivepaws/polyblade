@@ -1,5 +1,4 @@
 mod types;
-use iced::widget::shader::wgpu::{self};
 pub use types::*;
 
 pub enum BufferKind {
@@ -30,6 +29,10 @@ pub struct Buffer {
 impl Buffer {
     pub fn len(&self) -> usize {
         self.count
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.count == 0
     }
 
     pub fn new<T>(device: &wgpu::Device, label: &'static str, kind: BufferKind) -> Self {

@@ -1,7 +1,7 @@
 use rand::random;
 use ultraviolet::{Lerp as _, Vec3};
 
-use super::{VertexId, SPEED_DAMPENING};
+use super::{SPEED_DAMPENING, VertexId};
 
 #[derive(Debug, Clone)]
 pub struct Render {

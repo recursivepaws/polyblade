@@ -1,24 +1,21 @@
 use crate::{
+    Instant,
     polyhedron::Polyhedron,
     render::{
         camera::Camera,
+        color::RGBA,
         message::{ColorMethodMessage, PresetMessage},
         palette::Palette,
-        polydex::{Entry, InfoBox, Polydex},
     },
-    Instant,
 };
 
-use iced::{time::Duration, Color};
-use std::{f32::consts::PI, io::Read as _};
+use std::{f32::consts::PI, time::Duration};
 use ultraviolet::Mat4;
 
 #[derive(Debug, Default)]
 pub struct AppState {
     pub model: ModelState,
     pub render: RenderState,
-    pub polydex: Polydex,
-    pub info: InfoBox,
 }
 
 #[derive(Debug, Clone)]
@@ -34,14 +31,14 @@ pub struct RenderState {
     pub line_thickness: f32,
     pub method: ColorMethodMessage,
     pub picker: ColorPickerState,
-    pub background_color: Color,
+    pub background_color: RGBA,
 }
 
 #[derive(Debug, Clone)]
 pub struct ColorPickerState {
     pub palette: Palette,
     pub color_index: Option<usize>,
-    pub picked_color: Color,
+    pub picked_color: RGBA,
     pub colors: i16,
 }
 
@@ -59,7 +56,7 @@ impl Default for RenderState {
             line_thickness: 2.0,
             method: ColorMethodMessage::Polygon,
             picker: ColorPickerState::default(),
-            background_color: Color::WHITE,
+            background_color: RGBA::new(255, 255, 255, 255),
         }
     }
 }
@@ -69,7 +66,7 @@ impl Default for ColorPickerState {
         Self {
             palette: Palette::clement(),
             color_index: None,
-            picked_color: Color::from_rgba8(0, 0, 0, 1.0),
+            picked_color: RGBA::new(0, 0, 0, 255),
             colors: 1,
         }
     }
@@ -90,15 +87,6 @@ impl Default for ModelState {
             transform: Mat4::identity(),
         }
     }
-}
-
-#[allow(dead_code)]
-pub fn load_polydex() -> Result<Polydex, Box<dyn std::error::Error>> {
-    let mut polydex = std::fs::File::open("assets/polydex.ron")?;
-    let mut polydex_str = String::new();
-    polydex.read_to_string(&mut polydex_str)?;
-    let polydex: Vec<Entry> = ron::from_str(&polydex_str).map_err(|_| "Ron parsing error")?;
-    Ok(polydex)
 }
 
 impl AppState {
