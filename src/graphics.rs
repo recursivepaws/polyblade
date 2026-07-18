@@ -21,9 +21,9 @@ pub struct WGPUInstance<'window> {
 
 impl<'window> WGPUInstance<'window> {
     pub async fn new(target: SurfaceTarget<'window>) -> Self {
-        let target: SurfaceTarget<'window> = target.into();
-
+        #[allow(unused_mut)]
         let mut width = 1;
+        #[allow(unused_mut)]
         let mut height = 1;
 
         #[cfg(target_arch = "wasm32")]

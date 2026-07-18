@@ -38,7 +38,7 @@ enum Platonic {
 fn main() {
     cfg_if! {
         if #[cfg(target_arch = "wasm32")] {
-            console_log::init();
+            let _ = console_log::init();
         } else {
             colog::init();
         }
@@ -91,16 +91,16 @@ fn Navbar() -> Element {
 #[component]
 fn Home() -> Element {
     rsx! {
-        SpinningCube {}
+        PolyhedronCanvas {}
     }
 }
 
 #[component]
-pub fn SpinningCube() -> Element {
+pub fn PolyhedronCanvas() -> Element {
     cfg_if! {
         if #[cfg(target_arch = "wasm32")] {
             use_effect(move || {
-                if let Some(el) = polyblade::get_canvas(&"wgpu-canvas") {
+                if let Some(el) = polyblade::get_canvas("wgpu-canvas") {
                     spawn(async move {
                         let gpu = WGPUInstance::new(Canvas(el)).await;
                         info!("wgpu_instance created");

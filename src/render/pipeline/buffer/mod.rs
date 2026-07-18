@@ -31,6 +31,10 @@ impl Buffer {
         self.count
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.count == 0
+    }
+
     pub fn new<T>(device: &wgpu::Device, label: &'static str, kind: BufferKind) -> Self {
         let size_of_type = std::mem::size_of::<T>() as u64;
         let usage = kind.into();

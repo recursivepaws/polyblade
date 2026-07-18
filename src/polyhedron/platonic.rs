@@ -4,7 +4,7 @@ use PresetMessage::*;
 impl Polyhedron {
     pub fn preset(preset: &PresetMessage) -> Polyhedron {
         use PresetMessage::*;
-        let poly = match preset {
+        match preset {
             Octahedron => Self::octahedron(),
             Dodecahedron => todo!(),
             Icosahedron => Self::icosahedron(),
@@ -25,8 +25,7 @@ impl Polyhedron {
                     transactions: vec![],
                 }
             }
-        };
-        poly
+        }
     }
 
     fn octahedron() -> Polyhedron {

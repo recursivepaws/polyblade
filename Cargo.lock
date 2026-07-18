@@ -5023,7 +5023,6 @@ dependencies = [
  "bytemuck",
  "cfg-if",
  "colog",
- "color",
  "console_log",
  "dioxus",
  "dioxus-native",

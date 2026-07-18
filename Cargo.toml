@@ -7,7 +7,6 @@ edition = "2021"
 [dependencies]
 bytemuck = { version = "1.23.0", features = ["derive"] }
 cfg-if = { version = "1.0" }
-color = { version = "0.3" }
 dioxus = { version = "0.7.9", features = ["router"] }
 log = { version = "0.4.27" }
 rand = { version = "0.8.5" }
