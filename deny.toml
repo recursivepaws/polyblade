@@ -9,6 +9,19 @@ ignore = [
   # `paste` is unmaintained (no CVE), pulled in transitively via wgpu-hal's
   # macOS `metal` backend. No fix available upstream yet.
   "RUSTSEC-2024-0436",
+  # quick-xml DoS advisories (quadratic attribute scan / unbounded namespace
+  # allocation) only matter for untrusted network XML. Here quick-xml is pulled
+  # in transitively via zbus_xml (local D-Bus/atspi introspection) and
+  # wayland-scanner (local Wayland protocol XML) in the `native` feature's
+  # desktop stack - not attacker-controlled input. No fix available upstream
+  # (pinned by zbus-lockstep / wayland-scanner) yet.
+  "RUSTSEC-2026-0194",
+  "RUSTSEC-2026-0195",
+  # `rustybuzz` and `ttf-parser` are unmaintained (no CVE), pulled in
+  # transitively via usvg/blitz-dom in the `native` feature's SVG/font
+  # rendering stack. No fix available upstream yet.
+  "RUSTSEC-2026-0206",
+  "RUSTSEC-2026-0192",
 ]
 
 [licenses]

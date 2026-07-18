@@ -49,6 +49,10 @@ dx serve --platform linux --renderer native
 ```
 
 #### Conway Roadmap
+
+Due to the recent refactor, we're not as far along on this roadmap as we once were.
+Rest assured that in due time we will conquer all shapes.
+
 - [x] Ambo
 - [ ] Kis
 - [x] Truncate
