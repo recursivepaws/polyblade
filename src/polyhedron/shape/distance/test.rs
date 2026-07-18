@@ -46,7 +46,7 @@ fn basics() {
     assert_eq!(graph.neighbors(0), vec![1, 2]);
     assert_eq!(graph.neighbors(1), vec![0, 2]);
     assert_eq!(graph.neighbors(2), vec![0, 1]);
-    assert_eq!(graph.neighbors(3), vec![]);
+    assert_eq!(graph.neighbors(3), Vec::<VertexId>::new());
 
     // Disconnect
     graph.disconnect([0, 1]);
@@ -58,7 +58,7 @@ fn basics() {
     graph.delete(1);
     println!("graph: {graph}");
     assert_eq!(graph.neighbors(0), vec![1]);
-    assert_eq!(graph.neighbors(2), vec![]);
+    assert_eq!(graph.neighbors(2), Vec::<VertexId>::new());
     assert_eq!(graph.neighbors(1), vec![0]);
 }
 
