@@ -1,9 +1,9 @@
 [package]
 name = "polyblade"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["Vera Gonzalez <me@vera.lgbt>"]
 edition = "2024"
-license-file = "LICENSE"
+license = "AGPL-3.0-or-later"
 description = "Make shapes dance."
 repository = "https://github.com/organizedgrime/polyblade"
 readme = "README.md"

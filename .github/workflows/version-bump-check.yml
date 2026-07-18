@@ -1,0 +1,23 @@
+name: version-bump-check
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: git fetch origin ${{ github.base_ref }} --depth=1
+      - name: ensure Cargo.toml version was bumped
+        run: |
+          set -euo pipefail
+          current="$(grep -m1 '^version' Cargo.toml | sed -E 's/version = "(.*)"/\1/')"
+          base="$(git show origin/${{ github.base_ref }}:Cargo.toml | grep -m1 '^version' | sed -E 's/version = "(.*)"/\1/')"
+          echo "PR version: $current"
+          echo "${{ github.base_ref }} version: $base"
+          if [ "$current" == "$base" ]; then
+            echo "::error::Cargo.toml version must be bumped before merging into ${{ github.base_ref }} (currently $current)."
+            exit 1
+          fi

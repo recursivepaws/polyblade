@@ -2,11 +2,11 @@
     <h1>
         <img width="15%" src="./assets/logo.png"/>
         Polyblade
-        <a href="https://vera.lgbt/software/polyblade_live/index.html">
-            <img src="https://img.shields.io/website?url=https%3A//vera.lgbt/software/polyblade_live/index.html&label=demo&logo=webgl&logoSize=auto&style=for-the-badge"/>
+        <a href="https://polyblade.app">
+            <img src="https://img.shields.io/website?url=https%3A//polyblade.app&label=demo&logo=webgpu&logoSize=auto&style=for-the-badge"/>
         </a>
-        <a href="https://github.com/organizedgrime/polyblade/actions/workflows/ci.yml">
-            <img src="https://img.shields.io/github/actions/workflow/status/organizedgrime/polyblade/ci.yml?style=for-the-badge&label=CI%20Status"/>
+        <a href="https://github.com/recursivepaws/polyblade/actions/workflows/ci.yml">
+            <img src="https://img.shields.io/github/actions/workflow/status/recursivepaws/polyblade/ci.yml?style=for-the-badge&label=CI%20Status"/>
         </a>
         <a href="LICENSE">
             <img src="https://img.shields.io/badge/license-APGL3-blue.svg?style=for-the-badge"/>
@@ -38,21 +38,29 @@ The main branch is not as functional as it once was, but this will be remedied s
 ## Installation
 ```cargo install polyblade```
 
-Note that the `webgl` demo is available [here](https://vera.lgbt/software/polyblade/), but is notably less performant than native code.
+Note that the `webGPU` demo is available [here](https://polyblade.app). It runs just as smoothly as the native application.
 
 ### Build from source
-To run this software, simply clone the repository and use `cargo run --release`.
-For the `webgl` build, run `trunk serve --release`.
+To run this software, simply clone the repository and use the dioxus CLI.
+
+```bash
+dx serve --platform web
+dx serve --platform linux --renderer native
+```
 
 #### Conway Roadmap
+
+Due to the recent refactor, we're not as far along on this roadmap as we once were.
+Rest assured that in due time we will conquer all shapes.
+
 - [x] Ambo
-- [x] Kis
+- [ ] Kis
 - [x] Truncate
 - [ ] Ortho
-- [x] Bevel
-- [x] Expand
+- [ ] Bevel
+- [ ] Expand
 - [ ] Snub
-- [x] Join
+- [ ] Join
 - [ ] Zip
 - [ ] Gyro
 - [ ] Meta

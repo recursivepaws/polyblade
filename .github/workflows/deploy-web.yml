@@ -1,0 +1,43 @@
+name: deploy-web
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/determinate-nix-action@v3
+      - uses: actions/cache@v4
+        with:
+          key: ${{ runner.os }}-deploy-web-rust-${{ hashFiles('**/Cargo.toml', '**/Cargo.lock') }}-${{ github.sha }}
+          path: |
+            ~/.cargo/registry/cache/
+            ~/.cargo/registry/index/
+            ~/.cargo/git/db/
+            target/
+          restore-keys: |
+            ${{ runner.os }}-deploy-web-rust-${{ hashFiles('**/Cargo.toml', '**/Cargo.lock') }}-
+            ${{ runner.os }}-deploy-web-rust-
+      - name: regenerate tailwind CSS
+        run: nix develop -c tailwindcss -i ./tailwind.css -o ./assets/tailwind.css --minify
+      - name: dx bundle --platform web
+        run: nix develop -c dx bundle --platform web --release --out-dir dist
+      - name: inject vercel.json
+        run: cp deploy/vercel.json dist/public/vercel.json
+      - name: install vercel CLI
+        run: npm install -g vercel@latest
+      - name: deploy to vercel
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            vercel deploy dist/public --prod --token="$VERCEL_TOKEN" --yes
+          else
+            vercel deploy dist/public --token="$VERCEL_TOKEN" --yes
+          fi

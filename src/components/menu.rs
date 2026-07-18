@@ -60,12 +60,10 @@ pub fn MenuBar() -> Element {
                 div { class: "item has-sub",
                     "Platonic solids"
                     div { class: "submenu",
-                        for (preset , shortcut) in platonic_items() {
+                        for (preset, shortcut) in platonic_items() {
                             div {
                                 class: "item",
-                                onclick: move |_| {
-                                    push_message(PolybladeMessage::Preset(preset.clone()))
-                                },
+                                onclick: move |_| { push_message(PolybladeMessage::Preset(preset.clone())) },
                                 "{preset}"
                                 span { class: "shortcut", "{shortcut}" }
                             }

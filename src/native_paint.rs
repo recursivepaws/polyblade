@@ -86,10 +86,10 @@ impl ActiveRenderer {
         width: u32,
         height: u32,
     ) -> Option<TextureHandle> {
-        if let Some(next) = &self.next_texture {
-            if next.texture.width() != width || next.texture.height() != height {
-                ctx.unregister_texture(self.next_texture.take().unwrap().handle);
-            }
+        if let Some(next) = &self.next_texture
+            && (next.texture.width() != width || next.texture.height() != height)
+        {
+            ctx.unregister_texture(self.next_texture.take().unwrap().handle);
         }
 
         let texture_and_handle = match &self.next_texture {
