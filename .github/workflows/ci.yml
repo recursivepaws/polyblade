@@ -16,7 +16,7 @@ jobs:
   version-bump:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - if: github.event_name == 'pull_request'
         run: git fetch origin ${{ github.base_ref }} --depth=1
       - name: ensure Cargo.toml version was bumped
@@ -35,9 +35,9 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: DeterminateSystems/determinate-nix-action@v3
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           key: ${{ runner.os }}-${{ github.workflow }}-v2-rust-${{ github.job }}-${{ hashFiles('**/Cargo.toml', '**/Cargo.lock') }}-${{ github.sha }}
           path: |
@@ -53,9 +53,9 @@ jobs:
   format:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: DeterminateSystems/determinate-nix-action@v3
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           key: ${{ runner.os }}-${{ github.workflow }}-v2-rust-${{ github.job }}-${{ hashFiles('**/Cargo.toml', '**/Cargo.lock') }}-${{ github.sha }}
           path: |
@@ -78,9 +78,9 @@ jobs:
   audit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: DeterminateSystems/determinate-nix-action@v3
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           key: ${{ runner.os }}-${{ github.workflow }}-v2-rust-${{ github.job }}-${{ hashFiles('**/Cargo.toml', '**/Cargo.lock') }}-${{ github.sha }}
           path: |
@@ -99,9 +99,9 @@ jobs:
   dx-build-web:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: DeterminateSystems/determinate-nix-action@v3
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           key: ${{ runner.os }}-${{ github.workflow }}-v2-rust-${{ github.job }}-${{ hashFiles('**/Cargo.toml', '**/Cargo.lock') }}-${{ github.sha }}
           path: |
@@ -120,9 +120,9 @@ jobs:
   dx-build-native:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: DeterminateSystems/determinate-nix-action@v3
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           key: ${{ runner.os }}-${{ github.workflow }}-v2-rust-${{ github.job }}-${{ hashFiles('**/Cargo.toml', '**/Cargo.lock') }}-${{ github.sha }}
           path: |

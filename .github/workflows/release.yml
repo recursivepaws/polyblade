@@ -17,7 +17,7 @@ jobs:
       changed: ${{ steps.check.outputs.changed }}
       version: ${{ steps.check.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 2
       - id: check
@@ -41,11 +41,11 @@ jobs:
     if: needs.check-version.outputs.changed == 'true'
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: DeterminateSystems/determinate-nix-action@v3
       - name: regenerate tailwind CSS
         run: nix develop -c tailwindcss -i ./tailwind.css -o ./assets/tailwind.css --minify
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: tailwind-css
           path: assets/tailwind.css
@@ -68,8 +68,8 @@ jobs:
             package_types: msi
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v7
         with:
           name: tailwind-css
           path: assets
@@ -97,7 +97,7 @@ jobs:
           else
             nix develop -c dx bundle --platform ${{ matrix.platform }} --release $PKG_ARGS --out-dir dist
           fi
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: bundle-${{ matrix.platform }}
           path: dist/**
@@ -109,7 +109,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           pattern: bundle-*
           path: dist
