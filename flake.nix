@@ -40,10 +40,9 @@
           targets = [ "wasm32-unknown-unknown" ];
         };
 
-        # dioxus-cli itself links against tao/wry (the desktop webview crates)
-        # for its bundler/preview tooling, even when you only ever target
-        # `--platform web`. Per https://dioxuslabs.com/learn/0.7/getting_started/#linux
-        # these are required to build (and run) `dx` on Linux at all.
+        # dioxus-cli itself links against tao/wry (the desktop webview crates) for its bundler/preview tooling,
+        # even when you only ever target `--platform web`.
+        # Per https://dioxuslabs.com/learn/0.7/getting_started/#linux these are required to build (and run) `dx` on Linux at all.
         webviewLibs = with pkgs; [
           webkitgtk_4_1
           glib
@@ -78,12 +77,10 @@
               pkg-config
               dioxus-cli
               wasmBindgenCli
-              binaryen # provides wasm-opt, used by `dx bundle --release`
-              tailwindcss # v3 standalone CLI, matches tailwind.config.js
+              binaryen
+              tailwindcss
               mold
               lld
-              # Asset pipeline (manganis) transitively optimizes images and
-              # occasionally needs a codec assembler at build time.
               nasm
             ]
             ++ webviewLibs;
