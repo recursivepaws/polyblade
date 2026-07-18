@@ -30,7 +30,7 @@ jobs:
             previous=""
           fi
           echo "version=$current" >> "$GITHUB_OUTPUT"
-          if [ "$current" != "$previous" ]; then
+          if [ "$current" != "$previous" ] || [ "${{ github.event.inputs.skip_release }}" = "true" ]; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
           else
             echo "changed=false" >> "$GITHUB_OUTPUT"
