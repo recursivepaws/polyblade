@@ -1,8 +1,20 @@
 [package]
 name = "polyblade"
-version = "0.1.0"
+version = "0.3.0"
 authors = ["Vera Gonzalez <me@vera.lgbt>"]
-edition = "2021"
+edition = "2024"
+license-file = "LICENSE"
+description = "Make shapes dance."
+repository = "https://github.com/organizedgrime/polyblade"
+readme = "README.md"
+keywords = ["WebGPU", "graphics", "graphs", "polyhedra"]
+categories = [
+  "graphics",
+  "mathematics",
+  "visualization",
+  "wasm",
+  "web-programming",
+]
 
 [dependencies]
 bytemuck = { version = "1.23.0", features = ["derive"] }
@@ -14,6 +26,9 @@ strum = { version = "0.27" }
 strum_macros = { version = "0.27" }
 ultraviolet = { version = "0.9.2", features = ["bytemuck"] }
 wgpu = { version = "26", features = ["webgpu"] }
+
+[dev-dependencies]
+test-case = "3"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 colog = { version = "1.3.0" }
@@ -33,22 +48,19 @@ web-sys = { version = "0.3.77", features = [
 ] }
 web-time = { version = "1" }
 
-[dev-dependencies]
-test-case = "3"
-
 [features]
 default = ["web"]
 fullstack = ["dioxus/fullstack"]
-native = ["dioxus/native", "dep:dioxus-native"]
+native = ["dep:dioxus-native", "dioxus/native"]
 web = ["dioxus/web"]
 
 [profile]
-[profile.wasm-dev]
+[profile.android-dev]
 inherits = "dev"
-opt-level = 1
 
 [profile.server-dev]
 inherits = "dev"
 
-[profile.android-dev]
+[profile.wasm-dev]
 inherits = "dev"
+opt-level = 1
