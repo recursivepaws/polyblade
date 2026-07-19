@@ -57,7 +57,7 @@ Rest assured that in due time we will conquer all shapes.
 - [ ] Kis
 - [x] Truncate
 - [ ] Ortho
-- [ ] Bevel
+- [x] Bevel
 - [ ] Expand
 - [ ] Snub
 - [ ] Join
