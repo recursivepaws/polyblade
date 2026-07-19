@@ -63,6 +63,7 @@
           libGL
           fontconfig
           libx11
+          libxcb
           libxcursor
           libxi
           libxrandr
