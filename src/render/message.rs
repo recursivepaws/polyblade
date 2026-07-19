@@ -257,8 +257,14 @@ impl ProcessMessage<AppState> for PolybladeMessage {
 
                 if state.render.schlegel {
                     let safe_offset = state.model.polyhedron.schlegel_safe_eye_offset(state.render.zoom);
+                    // Tighten slowly (damps transient spring-settling skew) but relax quickly.
+                    let rate = if safe_offset < state.render.schlegel_eye_offset {
+                        0.02
+                    } else {
+                        0.25
+                    };
                     state.render.schlegel_eye_offset +=
-                        (safe_offset - state.render.schlegel_eye_offset) * 0.2;
+                        (safe_offset - state.render.schlegel_eye_offset) * rate;
 
                     let (eye, target, up, fov_y, near, far) = state
                         .model

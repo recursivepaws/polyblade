@@ -265,19 +265,55 @@ impl Polyhedron {
             .fold(f32::MAX, f32::min)
     }
 
-    /// Largest eye_offset for which every vertex still projects inside face 0's inscribed circle.
+    /// Distance from a 2D polygon's local origin to its boundary along a unit direction.
+    /// Used so containment is measured against face 0's true shape, not a circle approximation.
+    fn polygon_boundary_distance(poly: &[(f32, f32)], dir: (f32, f32)) -> f32 {
+        let n = poly.len();
+        (0..n)
+            .filter_map(|i| {
+                let (ax, ay) = poly[i];
+                let (bx, by) = poly[(i + 1) % n];
+                let (ex, ey) = (bx - ax, by - ay);
+                let d = ex * dir.1 - ey * dir.0;
+                if d.abs() < 1e-9 {
+                    return None;
+                }
+                let t = (ex * ay - ey * ax) / d;
+                let s = (dir.0 * ay - dir.1 * ax) / d;
+                (t > 0.0 && (-1e-3..=1.0 + 1e-3).contains(&s)).then_some(t)
+            })
+            .fold(f32::MAX, f32::min)
+    }
+
+    /// Largest eye_offset for which every vertex still projects inside face 0's true boundary.
     /// The depth epsilon is scaled to `inradius` to avoid flicker from simulation noise.
     pub fn schlegel_safe_eye_offset(&self, requested: f32) -> f32 {
         let centroid = self.face_centroid(0);
         let normal = self.face_normal(0);
-        let inradius = self.face_inradius(0, centroid);
-        let depth_epsilon = inradius * 0.02;
+        let reference = self.render.positions[self.shape.cycles[0][0]] - centroid;
+        let u = reference.normalized();
+        let v = normal.cross(u).normalized();
+        let polygon: Vec<(f32, f32)> = self.shape.cycles[0]
+            .iter()
+            .map(|&i| {
+                let q = self.render.positions[i] - centroid;
+                (q.dot(u), q.dot(v))
+            })
+            .collect();
+
+        let depth_epsilon = self.face_inradius(0, centroid) * 0.02;
         let bound = self.render.positions.iter().fold(f32::MAX, |bound, &p| {
             let q = p - centroid;
             let depth = -q.dot(normal); // distance behind face 0's plane; convex faces give depth >= 0
-            let lateral = (q - q.dot(normal) * normal).mag();
-            if depth > depth_epsilon && lateral > inradius {
-                bound.min(depth * inradius / (lateral - inradius))
+            let lateral = q - q.dot(normal) * normal;
+            let lateral_mag = lateral.mag();
+            if depth <= depth_epsilon || lateral_mag < 1e-6 {
+                return bound;
+            }
+            let dir = (lateral.dot(u) / lateral_mag, lateral.dot(v) / lateral_mag);
+            let boundary = Self::polygon_boundary_distance(&polygon, dir);
+            if lateral_mag > boundary {
+                bound.min(depth * boundary / (lateral_mag - boundary))
             } else {
                 bound
             }
