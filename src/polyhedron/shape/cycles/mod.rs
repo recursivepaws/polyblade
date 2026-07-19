@@ -179,8 +179,7 @@ impl From<&Distance> for Cycles {
 
         let cycles = cycles.into_iter().collect::<Vec<_>>();
 
-        // Map each undirected edge to the faces that share it, to score how locally uniform
-        // each face's neighborhood is.
+        // Map each undirected edge to the faces sharing it, to score neighborhood uniformity.
         let mut edge_faces: HashMap<[VertexId; 2], Vec<usize>> = HashMap::new();
         for (i, cycle) in cycles.iter().enumerate() {
             let n = cycle.len();
