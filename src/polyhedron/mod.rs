@@ -14,6 +14,7 @@ use std::{collections::HashMap, time::Duration};
 
 use crate::Instant;
 use crate::render::{
+    camera::Camera,
     message::{ConwayMessage, PresetMessage},
     pipeline::{MomentVertex, ShapeVertex},
 };
@@ -25,6 +26,15 @@ pub const SPEED_DAMPENING: f32 = 0.92;
 
 /// Margin for the auto-fit Schlegel FOV so extremal vertices don't touch the viewport edge.
 const SCHLEGEL_FOV_FILL: f32 = 0.85;
+
+/// Smallest eye_offset `schlegel_safe_eye_offset` will ever return.
+const SCHLEGEL_MIN_EYE_OFFSET: f32 = 0.02;
+
+/// Safety margin applied to the computed containment bound, so vertices sit strictly inside face 0.
+const SCHLEGEL_CONTAINMENT_MARGIN: f32 = 0.9;
+
+/// Depth epsilon for the containment check, scaled to face 0's inradius to avoid flicker.
+const SCHLEGEL_DEPTH_EPSILON_FACTOR: f32 = 0.02;
 
 #[derive(Debug, Clone)]
 pub struct Polyhedron {
@@ -301,7 +311,7 @@ impl Polyhedron {
             })
             .collect();
 
-        let depth_epsilon = self.face_inradius(0, centroid) * 0.02;
+        let depth_epsilon = self.face_inradius(0, centroid) * SCHLEGEL_DEPTH_EPSILON_FACTOR;
         let bound = self.render.positions.iter().fold(f32::MAX, |bound, &p| {
             let q = p - centroid;
             let depth = -q.dot(normal); // distance behind face 0's plane; convex faces give depth >= 0
@@ -318,12 +328,13 @@ impl Polyhedron {
                 bound
             }
         });
-        requested.min(bound * 0.9).clamp(0.02, requested)
+        let requested = requested.max(SCHLEGEL_MIN_EYE_OFFSET);
+        (requested.min(bound * SCHLEGEL_CONTAINMENT_MARGIN)).max(SCHLEGEL_MIN_EYE_OFFSET)
     }
 
-    /// Camera params for a Schlegel-diagram view through face 0 at a given eye_offset.
+    /// Camera for a Schlegel-diagram view through face 0 at a given eye_offset.
     /// Fitting the FOV to face 0's own circumradius alone is sufficient, given `schlegel_safe_eye_offset`.
-    pub fn schlegel_camera_from_offset(&self, eye_offset: f32) -> (Vec3, Vec3, Vec3, f32, f32, f32) {
+    pub fn schlegel_camera_from_offset(&self, eye_offset: f32) -> Camera {
         let centroid = self.face_centroid(0);
         let normal = self.face_normal(0);
         let reference_vertex = self.render.positions[self.shape.cycles[0][0]];
@@ -348,7 +359,14 @@ impl Polyhedron {
         let near = (eye_offset * 0.1).max(0.01);
         let far = (max_dist * 1.2).max(near + 1.0);
 
-        (eye, target, up, fov_y, near, far)
+        Camera {
+            eye,
+            target,
+            up,
+            fov_y,
+            near,
+            far,
+        }
     }
 
     pub fn moment_vertices(&self, colors: &[crate::render::color::RGBA]) -> Vec<MomentVertex> {

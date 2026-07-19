@@ -6,7 +6,12 @@ use crate::{
 use std::fmt::Display;
 use strum_macros::{Display, EnumIter};
 
-use crate::render::state::{AppState, ColorPickerState, ModelState, RenderState};
+use crate::render::state::{AppState, ColorPickerState, ModelState, RenderState, SCHLEGEL_DEFAULT_EYE_OFFSET};
+
+/// Per-tick lerp rate for `schlegel_eye_offset` when it needs to shrink (tighten).
+const SCHLEGEL_TIGHTEN_RATE: f32 = 0.02;
+/// Per-tick lerp rate for `schlegel_eye_offset` when it can grow (relax).
+const SCHLEGEL_RELAX_RATE: f32 = 0.25;
 
 /// Messages queued by the UI, drained by `RenderDriver::tick` each frame. A
 /// global is used because the driver lives inside the render loop (wasm) or
@@ -187,7 +192,7 @@ impl ProcessMessage<RenderState> for RenderMessage {
                 state.schlegel = *schlegel;
                 if *schlegel {
                     // eye_offset beyond face 0's plane; fov/near/far recomputed every Tick
-                    state.zoom = 0.5;
+                    state.zoom = SCHLEGEL_DEFAULT_EYE_OFFSET;
                     state.schlegel_eye_offset = state.zoom;
                 } else {
                     state.camera = Camera::default();
@@ -259,23 +264,17 @@ impl ProcessMessage<AppState> for PolybladeMessage {
                     let safe_offset = state.model.polyhedron.schlegel_safe_eye_offset(state.render.zoom);
                     // Tighten slowly (damps transient spring-settling skew) but relax quickly.
                     let rate = if safe_offset < state.render.schlegel_eye_offset {
-                        0.02
+                        SCHLEGEL_TIGHTEN_RATE
                     } else {
-                        0.25
+                        SCHLEGEL_RELAX_RATE
                     };
                     state.render.schlegel_eye_offset +=
                         (safe_offset - state.render.schlegel_eye_offset) * rate;
 
-                    let (eye, target, up, fov_y, near, far) = state
+                    state.render.camera = state
                         .model
                         .polyhedron
                         .schlegel_camera_from_offset(state.render.schlegel_eye_offset);
-                    state.render.camera.eye = eye;
-                    state.render.camera.target = target;
-                    state.render.camera.up = up;
-                    state.render.camera.fov_y = fov_y;
-                    state.render.camera.near = near;
-                    state.render.camera.far = far;
                 }
             }
             Preset(preset) => preset.process(&mut state.model),
