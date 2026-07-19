@@ -93,10 +93,10 @@ jobs:
           PKG_ARGS=""
           for t in ${{ matrix.package_types }}; do PKG_ARGS="$PKG_ARGS --package-types $t"; done
           if [ "${{ matrix.platform }}" = "windows" ]; then
-            dx bundle --platform ${{ matrix.platform }} --release $PKG_ARGS --out-dir dist
+            dx bundle --platform ${{ matrix.platform }} --renderer native --release $PKG_ARGS --out-dir dist
           else
             # mksquashfs (via appimagetool) rejects Nix's SOURCE_DATE_EPOCH alongside its own timestamp flags.
-            nix develop -c env -u SOURCE_DATE_EPOCH dx bundle --platform ${{ matrix.platform }} --release $PKG_ARGS --out-dir dist
+            nix develop -c env -u SOURCE_DATE_EPOCH dx bundle --platform ${{ matrix.platform }} --renderer native --release $PKG_ARGS --out-dir dist
           fi
       - uses: actions/upload-artifact@v6
         with:
