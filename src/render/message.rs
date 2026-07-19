@@ -186,10 +186,12 @@ impl ProcessMessage<RenderState> for RenderMessage {
             Schlegel(schlegel) => {
                 state.schlegel = *schlegel;
                 if *schlegel {
-                    state.camera.fov_y = 2.9;
-                    state.zoom = 1.1;
+                    // eye_offset beyond face 0's plane; fov/near/far recomputed every Tick
+                    state.zoom = 0.5;
+                    state.schlegel_eye_offset = state.zoom;
                 } else {
                     state.camera = Camera::default();
+                    state.zoom = 1.0;
                 }
             }
             Rotating(rotating) => {
@@ -251,12 +253,24 @@ impl ProcessMessage<AppState> for PolybladeMessage {
         use PolybladeMessage::*;
         match self {
             Tick(time) => {
-                if state.render.schlegel {
-                    state.render.camera.eye =
-                        state.model.polyhedron.face_centroid(0) * state.render.zoom;
-                }
-
                 state.update_state(*time);
+
+                if state.render.schlegel {
+                    let safe_offset = state.model.polyhedron.schlegel_safe_eye_offset(state.render.zoom);
+                    state.render.schlegel_eye_offset +=
+                        (safe_offset - state.render.schlegel_eye_offset) * 0.2;
+
+                    let (eye, target, up, fov_y, near, far) = state
+                        .model
+                        .polyhedron
+                        .schlegel_camera_from_offset(state.render.schlegel_eye_offset);
+                    state.render.camera.eye = eye;
+                    state.render.camera.target = target;
+                    state.render.camera.up = up;
+                    state.render.camera.fov_y = fov_y;
+                    state.render.camera.near = near;
+                    state.render.camera.far = far;
+                }
             }
             Preset(preset) => preset.process(&mut state.model),
             Conway(conway) => conway.process(&mut state.model),
