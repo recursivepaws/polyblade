@@ -95,7 +95,8 @@ jobs:
           if [ "${{ matrix.platform }}" = "windows" ]; then
             dx bundle --platform ${{ matrix.platform }} --release $PKG_ARGS --out-dir dist
           else
-            nix develop -c dx bundle --platform ${{ matrix.platform }} --release $PKG_ARGS --out-dir dist
+            # mksquashfs (via appimagetool) rejects Nix's SOURCE_DATE_EPOCH alongside its own timestamp flags.
+            nix develop -c env -u SOURCE_DATE_EPOCH dx bundle --platform ${{ matrix.platform }} --release $PKG_ARGS --out-dir dist
           fi
       - uses: actions/upload-artifact@v6
         with:
