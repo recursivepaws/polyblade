@@ -17,7 +17,7 @@ jobs:
       changed: ${{ steps.check.outputs.changed }}
       version: ${{ steps.check.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 2
       - id: check
@@ -30,14 +30,28 @@ jobs:
             previous=""
           fi
           echo "version=$current" >> "$GITHUB_OUTPUT"
-          if [ "$current" != "$previous" ]; then
+          if [ "$current" != "$previous" ] || [ "${{ github.event.inputs.skip_release }}" = "true" ]; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
           else
             echo "changed=false" >> "$GITHUB_OUTPUT"
           fi
 
-  bundle:
+  prepare-assets:
     needs: check-version
+    if: needs.check-version.outputs.changed == 'true'
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: DeterminateSystems/determinate-nix-action@v3
+      - name: regenerate tailwind CSS
+        run: nix develop -c tailwindcss -i ./tailwind.css -o ./assets/tailwind.css --minify
+      - uses: actions/upload-artifact@v6
+        with:
+          name: tailwind-css
+          path: assets/tailwind.css
+
+  bundle:
+    needs: [check-version, prepare-assets]
     if: needs.check-version.outputs.changed == 'true'
     strategy:
       fail-fast: false
@@ -54,20 +68,37 @@ jobs:
             package_types: msi
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: DeterminateSystems/determinate-nix-action@v3
-      - name: regenerate tailwind CSS
-        run: nix develop -c tailwindcss -i ./tailwind.css -o ./assets/tailwind.css --minify
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v7
+        with:
+          name: tailwind-css
+          path: assets
+      # Linux and macOS: Nix provides the exact same dioxus-cli/toolchain as local dev.
+      - if: matrix.platform != 'windows'
+        uses: DeterminateSystems/determinate-nix-action@v3
       - if: matrix.platform == 'linux'
         name: install libfuse2 (AppImage runtime dependency)
         run: sudo apt-get update && sudo apt-get install -y libfuse2
+      # Windows: Nix has no Windows platform support at all, so install the toolchain the ordinary way.
+      - if: matrix.platform == 'windows'
+        uses: dtolnay/rust-toolchain@stable
+      - if: matrix.platform == 'windows'
+        uses: cargo-bins/cargo-binstall@main
+      - if: matrix.platform == 'windows'
+        name: install dioxus-cli
+        run: cargo binstall -y dioxus-cli --version 0.7.9
       - name: dx bundle
         shell: bash
         run: |
           PKG_ARGS=""
           for t in ${{ matrix.package_types }}; do PKG_ARGS="$PKG_ARGS --package-types $t"; done
-          nix develop -c dx bundle --platform ${{ matrix.platform }} --release $PKG_ARGS --out-dir dist
-      - uses: actions/upload-artifact@v4
+          if [ "${{ matrix.platform }}" = "windows" ]; then
+            dx bundle --platform ${{ matrix.platform }} --renderer native --release $PKG_ARGS --out-dir dist
+          else
+            # mksquashfs (via appimagetool) rejects Nix's SOURCE_DATE_EPOCH alongside its own timestamp flags.
+            nix develop -c env -u SOURCE_DATE_EPOCH dx bundle --platform ${{ matrix.platform }} --renderer native --release $PKG_ARGS --out-dir dist
+          fi
+      - uses: actions/upload-artifact@v6
         with:
           name: bundle-${{ matrix.platform }}
           path: dist/**
@@ -79,7 +110,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           pattern: bundle-*
           path: dist
