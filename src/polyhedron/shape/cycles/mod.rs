@@ -2,7 +2,7 @@ mod cycle;
 use crate::{polyhedron::VertexId, render::pipeline::ShapeVertex};
 pub use cycle::*;
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     ops::{Index, IndexMut},
 };
 use ultraviolet::{Vec3, Vec4};
@@ -177,8 +177,47 @@ impl From<&Distance> for Cycles {
             }
         }
 
-        let mut cycles = cycles.into_iter().collect::<Vec<_>>();
-        cycles.sort_by_key(|c| usize::MAX - c.len());
+        let cycles = cycles.into_iter().collect::<Vec<_>>();
+
+        // Map each undirected edge to the faces sharing it, to score neighborhood uniformity.
+        let mut edge_faces: HashMap<[VertexId; 2], Vec<usize>> = HashMap::new();
+        for (i, cycle) in cycles.iter().enumerate() {
+            let n = cycle.len();
+            for k in 0..n {
+                let (a, b) = (cycle[k], cycle[(k + 1) % n]);
+                let edge = if a < b { [a, b] } else { [b, a] };
+                edge_faces.entry(edge).or_default().push(i);
+            }
+        }
+        // Fewer distinct neighbor side-counts means a more locally symmetric/uniform face.
+        let neighbor_uniformity: Vec<usize> = cycles
+            .iter()
+            .enumerate()
+            .map(|(i, cycle)| {
+                let n = cycle.len();
+                let types: HashSet<usize> = (0..n)
+                    .filter_map(|k| {
+                        let (a, b) = (cycle[k], cycle[(k + 1) % n]);
+                        let edge = if a < b { [a, b] } else { [b, a] };
+                        edge_faces[&edge]
+                            .iter()
+                            .find(|&&j| j != i)
+                            .map(|&j| cycles[j].len())
+                    })
+                    .collect();
+                types.len()
+            })
+            .collect();
+
+        let mut scored: Vec<(Vec<VertexId>, usize)> =
+            cycles.into_iter().zip(neighbor_uniformity).collect();
+        // Prefer more sides, then a more uniform neighborhood, then a deterministic tie-break.
+        scored.sort_by_key(|(c, uniformity)| {
+            let mut sorted_vertices = c.clone();
+            sorted_vertices.sort();
+            (usize::MAX - c.len(), *uniformity, sorted_vertices)
+        });
+        let cycles: Vec<Vec<VertexId>> = scored.into_iter().map(|(c, _)| c).collect();
         Cycles::new(cycles)
     }
 }

@@ -1,12 +1,11 @@
 [package]
 name = "polyblade"
-version = "0.3.2"
-authors = ["Vera Gonzalez <me@vera.lgbt>"]
+version = "0.3.3"
 edition = "2024"
-license = "AGPL-3.0-or-later"
 description = "Make shapes dance."
-repository = "https://github.com/organizedgrime/polyblade"
 readme = "README.md"
+repository = "https://github.com/organizedgrime/polyblade"
+license = "AGPL-3.0-or-later"
 keywords = ["WebGPU", "graphics", "graphs", "polyhedra"]
 categories = [
   "graphics",

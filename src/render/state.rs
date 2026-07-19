@@ -12,6 +12,9 @@ use crate::{
 use std::{f32::consts::PI, time::Duration};
 use ultraviolet::Mat4;
 
+/// Default eye_offset (distance beyond face 0's plane) when Schlegel mode is enabled.
+pub const SCHLEGEL_DEFAULT_EYE_OFFSET: f32 = 0.5;
+
 #[derive(Debug, Default)]
 pub struct AppState {
     pub model: ModelState,
@@ -28,6 +31,8 @@ pub struct RenderState {
     pub rotation_duration: Duration,
     pub rotating: bool,
     pub schlegel: bool,
+    /// Smoothed toward the safe eye_offset each tick, to damp single-frame geometry noise.
+    pub schlegel_eye_offset: f32,
     pub line_thickness: f32,
     pub method: ColorMethodMessage,
     pub picker: ColorPickerState,
@@ -53,6 +58,7 @@ impl Default for RenderState {
             rotation_duration: Duration::from_secs(0),
             rotating: true,
             schlegel: false,
+            schlegel_eye_offset: SCHLEGEL_DEFAULT_EYE_OFFSET,
             line_thickness: 2.0,
             method: ColorMethodMessage::Polygon,
             picker: ColorPickerState::default(),

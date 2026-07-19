@@ -14,6 +14,7 @@ use std::{collections::HashMap, time::Duration};
 
 use crate::Instant;
 use crate::render::{
+    camera::Camera,
     message::{ConwayMessage, PresetMessage},
     pipeline::{MomentVertex, ShapeVertex},
 };
@@ -22,6 +23,18 @@ use ultraviolet::{Vec3, Vec4};
 pub type VertexId = usize;
 
 pub const SPEED_DAMPENING: f32 = 0.92;
+
+/// Margin for the auto-fit Schlegel FOV so extremal vertices don't touch the viewport edge.
+const SCHLEGEL_FOV_FILL: f32 = 0.85;
+
+/// Smallest eye_offset `schlegel_safe_eye_offset` will ever return.
+const SCHLEGEL_MIN_EYE_OFFSET: f32 = 0.02;
+
+/// Safety margin applied to the computed containment bound, so vertices sit strictly inside face 0.
+const SCHLEGEL_CONTAINMENT_MARGIN: f32 = 0.9;
+
+/// Depth epsilon for the containment check, scaled to face 0's inradius to avoid flicker.
+const SCHLEGEL_DEPTH_EPSILON_FACTOR: f32 = 0.02;
 
 #[derive(Debug, Clone)]
 pub struct Polyhedron {
@@ -223,6 +236,137 @@ impl Polyhedron {
             .map(|&v| self.render.positions[v])
             .fold(Vec3::zero(), |a, b| a + b)
             / self.shape.cycles[face_index].len() as f32
+    }
+
+    /// Outward-pointing unit normal of a face, via Newell's method.
+    /// Sign is corrected against the face centroid, since cycles have no winding-order guarantee.
+    pub fn face_normal(&self, face_index: usize) -> Vec3 {
+        let cycle = &self.shape.cycles[face_index];
+        let n = cycle.len();
+        let mut normal = Vec3::zero();
+        for i in 0..n {
+            let current = self.render.positions[cycle[i]];
+            let next = self.render.positions[cycle[(i + 1) % n]];
+            normal.x += (current.y - next.y) * (current.z + next.z);
+            normal.y += (current.z - next.z) * (current.x + next.x);
+            normal.z += (current.x - next.x) * (current.y + next.y);
+        }
+        let normal = normal.normalized();
+        let centroid = self.face_centroid(face_index);
+        if normal.dot(centroid) < 0.0 {
+            -normal
+        } else {
+            normal
+        }
+    }
+
+    /// Inscribed-circle radius of a face: the distance from its centroid to its nearest edge.
+    fn face_inradius(&self, face_index: usize, centroid: Vec3) -> f32 {
+        let cycle = &self.shape.cycles[face_index];
+        let n = cycle.len();
+        (0..n)
+            .map(|i| {
+                let a = self.render.positions[cycle[i]];
+                let b = self.render.positions[cycle[(i + 1) % n]];
+                let ab = b - a;
+                let t = (centroid - a).dot(ab) / ab.mag_sq();
+                (centroid - (a + ab * t.clamp(0.0, 1.0))).mag()
+            })
+            .fold(f32::MAX, f32::min)
+    }
+
+    /// Distance from a 2D polygon's local origin to its boundary along a unit direction.
+    /// Used so containment is measured against face 0's true shape, not a circle approximation.
+    fn polygon_boundary_distance(poly: &[(f32, f32)], dir: (f32, f32)) -> f32 {
+        let n = poly.len();
+        (0..n)
+            .filter_map(|i| {
+                let (ax, ay) = poly[i];
+                let (bx, by) = poly[(i + 1) % n];
+                let (ex, ey) = (bx - ax, by - ay);
+                let d = ex * dir.1 - ey * dir.0;
+                if d.abs() < 1e-9 {
+                    return None;
+                }
+                let t = (ex * ay - ey * ax) / d;
+                let s = (dir.0 * ay - dir.1 * ax) / d;
+                (t > 0.0 && (-1e-3..=1.0 + 1e-3).contains(&s)).then_some(t)
+            })
+            .fold(f32::MAX, f32::min)
+    }
+
+    /// Largest eye_offset for which every vertex still projects inside face 0's true boundary.
+    /// The depth epsilon is scaled to `inradius` to avoid flicker from simulation noise.
+    pub fn schlegel_safe_eye_offset(&self, requested: f32) -> f32 {
+        let centroid = self.face_centroid(0);
+        let normal = self.face_normal(0);
+        let reference = self.render.positions[self.shape.cycles[0][0]] - centroid;
+        let u = reference.normalized();
+        let v = normal.cross(u).normalized();
+        let polygon: Vec<(f32, f32)> = self.shape.cycles[0]
+            .iter()
+            .map(|&i| {
+                let q = self.render.positions[i] - centroid;
+                (q.dot(u), q.dot(v))
+            })
+            .collect();
+
+        let depth_epsilon = self.face_inradius(0, centroid) * SCHLEGEL_DEPTH_EPSILON_FACTOR;
+        let bound = self.render.positions.iter().fold(f32::MAX, |bound, &p| {
+            let q = p - centroid;
+            let depth = -q.dot(normal); // distance behind face 0's plane; convex faces give depth >= 0
+            let lateral = q - q.dot(normal) * normal;
+            let lateral_mag = lateral.mag();
+            if depth <= depth_epsilon || lateral_mag < 1e-6 {
+                return bound;
+            }
+            let dir = (lateral.dot(u) / lateral_mag, lateral.dot(v) / lateral_mag);
+            let boundary = Self::polygon_boundary_distance(&polygon, dir);
+            if lateral_mag > boundary {
+                bound.min(depth * boundary / (lateral_mag - boundary))
+            } else {
+                bound
+            }
+        });
+        let requested = requested.max(SCHLEGEL_MIN_EYE_OFFSET);
+        (requested.min(bound * SCHLEGEL_CONTAINMENT_MARGIN)).max(SCHLEGEL_MIN_EYE_OFFSET)
+    }
+
+    /// Camera for a Schlegel-diagram view through face 0 at a given eye_offset.
+    /// Fitting the FOV to face 0's own circumradius alone is sufficient, given `schlegel_safe_eye_offset`.
+    pub fn schlegel_camera_from_offset(&self, eye_offset: f32) -> Camera {
+        let centroid = self.face_centroid(0);
+        let normal = self.face_normal(0);
+        let reference_vertex = self.render.positions[self.shape.cycles[0][0]];
+
+        let eye = centroid + normal * eye_offset;
+        let target = centroid - normal;
+        let up = (reference_vertex - centroid).normalized();
+
+        let circumradius = self.shape.cycles[0]
+            .iter()
+            .map(|&v| (self.render.positions[v] - centroid).mag())
+            .fold(0.0_f32, f32::max);
+        let half_fov = (circumradius / eye_offset).atan();
+        let fov_y = (2.0 * half_fov / SCHLEGEL_FOV_FILL).clamp(0.2, std::f32::consts::PI - 0.1);
+
+        let max_dist = self
+            .render
+            .positions
+            .iter()
+            .map(|&p| (p - eye).mag())
+            .fold(0.0_f32, f32::max);
+        let near = (eye_offset * 0.1).max(0.01);
+        let far = (max_dist * 1.2).max(near + 1.0);
+
+        Camera {
+            eye,
+            target,
+            up,
+            fov_y,
+            near,
+            far,
+        }
     }
 
     pub fn moment_vertices(&self, colors: &[crate::render::color::RGBA]) -> Vec<MomentVertex> {

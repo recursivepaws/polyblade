@@ -6,7 +6,14 @@ use crate::{
 use std::fmt::Display;
 use strum_macros::{Display, EnumIter};
 
-use crate::render::state::{AppState, ColorPickerState, ModelState, RenderState};
+use crate::render::state::{
+    AppState, ColorPickerState, ModelState, RenderState, SCHLEGEL_DEFAULT_EYE_OFFSET,
+};
+
+/// Per-tick lerp rate for `schlegel_eye_offset` when it needs to shrink (tighten).
+const SCHLEGEL_TIGHTEN_RATE: f32 = 0.02;
+/// Per-tick lerp rate for `schlegel_eye_offset` when it can grow (relax).
+const SCHLEGEL_RELAX_RATE: f32 = 0.25;
 
 /// Messages queued by the UI, drained by `RenderDriver::tick` each frame. A
 /// global is used because the driver lives inside the render loop (wasm) or
@@ -186,10 +193,12 @@ impl ProcessMessage<RenderState> for RenderMessage {
             Schlegel(schlegel) => {
                 state.schlegel = *schlegel;
                 if *schlegel {
-                    state.camera.fov_y = 2.9;
-                    state.zoom = 1.1;
+                    // eye_offset beyond face 0's plane; fov/near/far recomputed every Tick
+                    state.zoom = SCHLEGEL_DEFAULT_EYE_OFFSET;
+                    state.schlegel_eye_offset = state.zoom;
                 } else {
                     state.camera = Camera::default();
+                    state.zoom = 1.0;
                 }
             }
             Rotating(rotating) => {
@@ -251,12 +260,27 @@ impl ProcessMessage<AppState> for PolybladeMessage {
         use PolybladeMessage::*;
         match self {
             Tick(time) => {
-                if state.render.schlegel {
-                    state.render.camera.eye =
-                        state.model.polyhedron.face_centroid(0) * state.render.zoom;
-                }
-
                 state.update_state(*time);
+
+                if state.render.schlegel {
+                    let safe_offset = state
+                        .model
+                        .polyhedron
+                        .schlegel_safe_eye_offset(state.render.zoom);
+                    // Tighten slowly (damps transient spring-settling skew) but relax quickly.
+                    let rate = if safe_offset < state.render.schlegel_eye_offset {
+                        SCHLEGEL_TIGHTEN_RATE
+                    } else {
+                        SCHLEGEL_RELAX_RATE
+                    };
+                    state.render.schlegel_eye_offset +=
+                        (safe_offset - state.render.schlegel_eye_offset) * rate;
+
+                    state.render.camera = state
+                        .model
+                        .polyhedron
+                        .schlegel_camera_from_offset(state.render.schlegel_eye_offset);
+                }
             }
             Preset(preset) => preset.process(&mut state.model),
             Conway(conway) => conway.process(&mut state.model),
