@@ -456,6 +456,7 @@ impl Polyhedron {
         let mut distinct = signatures.clone();
         distinct.sort();
         distinct.dedup();
+        distinct.reverse();
         let color_map: HashMap<FaceTypeSignature, Vec4> = distinct
             .into_iter()
             .enumerate()
