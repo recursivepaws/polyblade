@@ -23,18 +23,15 @@ impl Polyhedron {
                     shape,
                     render,
                     transactions: vec![],
+                    face_coloring: FaceColoring::default(),
                 }
             }
         };
         // Bootstrapping is "reconciling from nothing", so reset ancestry here too.
         // Otherwise e.g. octahedron's internal construction-time ambo leaks into the user's first op.
         polyhedron.shape.reset_ancestry();
-        (
-            polyhedron.render.face_colors,
-            polyhedron.render.next_color_slot,
-        ) = polyhedron.bootstrap_face_colors();
-        polyhedron.render.render_color_indices =
-            dense_color_indices(&polyhedron.render.face_colors);
+        let (colors, next_color_slot) = polyhedron.bootstrap_face_colors();
+        polyhedron.face_coloring.bootstrap(colors, next_color_slot);
         polyhedron
     }
 

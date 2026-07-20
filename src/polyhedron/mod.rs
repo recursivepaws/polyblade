@@ -14,7 +14,7 @@ mod test;
 use std::time::Duration;
 
 use crate::Instant;
-use crate::polyhedron::face::{FaceCache, FaceTypeOption, FaceTypeSignature};
+use crate::polyhedron::face::{FaceColoring, FaceTypeOption, FaceTypeSignature};
 use crate::render::{
     camera::Camera,
     message::{ConwayMessage, PresetMessage},
@@ -48,17 +48,8 @@ pub struct Polyhedron {
     pub render: Render,
     /// Transaction queue
     pub transactions: Vec<Transaction>,
-}
-
-/// Maps `face_colors`'s ever-growing values to a dense render index, so two facetypes never collide merely by being congruent mod `colors.len()`.
-fn dense_color_indices(face_colors: &[usize]) -> Vec<usize> {
-    let mut distinct = face_colors.to_vec();
-    distinct.sort_unstable();
-    distinct.dedup();
-    face_colors
-        .iter()
-        .map(|slot| distinct.binary_search(slot).unwrap())
-        .collect()
+    /// Per-face color bookkeeping.
+    pub face_coloring: FaceColoring,
 }
 
 impl Polyhedron {
@@ -87,10 +78,7 @@ impl Polyhedron {
     }
 
     pub fn cache_faces(&mut self) {
-        self.render.face_cache = FaceCache {
-            ancestors: self.shape.ancestors(),
-            colors: self.render.face_colors.clone(),
-        };
+        self.face_coloring.snapshot(self.shape.ancestors());
     }
 
     pub fn process_transactions(&mut self, _speed: f32) {
@@ -464,80 +452,16 @@ impl Polyhedron {
         (face_colors, next_color_slot)
     }
 
-    /// Matches faces to a pre-mutation ancestry snapshot by Jaccard similarity, not raw overlap (which can let an inflated ancestor set beat a true match).
-    /// Results are then majority-voted per `FaceTypeSignature` to guarantee one color per facetype.
     fn reconcile_face_colors(&mut self) {
-        let old = self.render.face_cache.clone();
-        self.cache_faces();
-        let new = self.render.face_cache.clone();
-
+        let ancestors = self.shape.ancestors();
         let signatures = self.face_signatures();
-
-        // (new_face, old_face, intersection, union) per candidate pair with any overlap.
-        let mut candidates: Vec<(usize, usize, usize, usize)> = Vec::new();
-        for (i, ancestors) in new.ancestors.iter().enumerate() {
-            for (j, old) in old.ancestors.iter().enumerate() {
-                let intersection = old.intersection(ancestors).count();
-                if intersection > 0 {
-                    let union = old.union(ancestors).count();
-                    candidates.push((i, j, intersection, union));
-                }
-            }
-        }
-        // Rank by Jaccard similarity (descending), breaking ties by raw overlap count.
-        candidates.sort_by(|&(_, _, ia, ua), &(_, _, ib, ub)| {
-            let jaccard_a = ia as f64 / ua as f64;
-            let jaccard_b = ib as f64 / ub as f64;
-            jaccard_b.total_cmp(&jaccard_a).then(ib.cmp(&ia))
-        });
-
-        let mut matched_color: Vec<Option<usize>> = vec![None; new.ancestors.len()];
-        let mut old_claimed = vec![false; old.ancestors.len()];
-        for (i, j, ..) in candidates {
-            if matched_color[i].is_none() && !old_claimed[j] {
-                matched_color[i] = Some(old.colors[j]);
-                old_claimed[j] = true;
-            }
-        }
-
-        // Group by facetype and majority-vote one color per group.
-        let mut groups: Vec<(FaceTypeSignature, Vec<usize>)> = Vec::new();
-        for (i, sig) in signatures.iter().enumerate() {
-            match groups.iter_mut().find(|(s, _)| s == sig) {
-                Some((_, members)) => members.push(i),
-                None => groups.push((sig.clone(), vec![i])),
-            }
-        }
-
-        let mut new_colors = vec![0; new.ancestors.len()];
-        for (_, members) in &groups {
-            let mut votes: Vec<(Option<usize>, usize)> = Vec::new();
-            for &i in members {
-                match votes.iter_mut().find(|(v, _)| *v == matched_color[i]) {
-                    Some((_, count)) => *count += 1,
-                    None => votes.push((matched_color[i], 1)),
-                }
-            }
-            let winner = votes.iter().max_by_key(|(_, count)| *count).unwrap().0;
-
-            let color = winner.unwrap_or_else(|| {
-                let slot = self.render.next_color_slot;
-                self.render.next_color_slot += 1;
-                slot
-            });
-            for &i in members {
-                new_colors[i] = color;
-            }
-        }
-
-        self.render.face_colors = new_colors;
-        self.render.render_color_indices = dense_color_indices(&self.render.face_colors);
+        self.face_coloring.reconcile(ancestors, &signatures);
         // Reset ancestry now so it never accumulates past one operation (see `Distance::reset_ancestry`).
         self.shape.reset_ancestry();
     }
 
     pub fn moment_vertices(&self, colors: &[crate::render::color::RGBA]) -> Vec<MomentVertex> {
-        let render_colors = &self.render.render_color_indices;
+        let render_colors = &self.face_coloring.render_indices;
         let Polyhedron { shape, render, .. } = self;
 
         shape

@@ -1,8 +1,6 @@
 use rand::random;
 use ultraviolet::{Lerp as _, Vec3};
 
-use crate::polyhedron::face::FaceCache;
-
 use super::{SPEED_DAMPENING, VertexId};
 
 #[derive(Debug, Clone)]
@@ -13,13 +11,6 @@ pub struct Render {
     pub speeds: Vec<Vec3>,
     /// Edge length
     pub edge_length: f32,
-    /// Palette-relative color slot per current face, parallel to `shape.cycles`.
-    pub face_colors: Vec<usize>,
-    /// Next unused color slot; monotonically increasing so new facetypes get distinct colors.
-    pub next_color_slot: usize,
-    /// Dense render index per face, derived from `face_colors`; kept in sync wherever `face_colors` is set.
-    pub render_color_indices: Vec<usize>,
-    pub face_cache: FaceCache,
 }
 
 //impl rand::
@@ -35,10 +26,6 @@ impl Render {
             positions: random_positions(n),
             speeds: vec![Vec3::zero(); n],
             edge_length: 1.0,
-            face_colors: vec![],
-            next_color_slot: 0,
-            render_color_indices: vec![],
-            face_cache: Default::default(),
         }
     }
 

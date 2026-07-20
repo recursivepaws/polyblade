@@ -55,7 +55,7 @@ fn assert_uniform_colors_per_facetype(polyhedron: &Polyhedron) {
     let signatures = polyhedron.face_signatures();
     let mut seen: Vec<(FaceTypeSignature, usize)> = Vec::new();
     for (i, sig) in signatures.iter().enumerate() {
-        let color = polyhedron.render.face_colors[i];
+        let color = polyhedron.face_coloring.colors[i];
         match seen.iter().find(|(s, _)| s == sig) {
             Some((_, expected)) => {
                 assert_eq!(
@@ -75,7 +75,7 @@ fn color_for_signature(polyhedron: &Polyhedron, target: &FaceTypeSignature) -> u
         .iter()
         .position(|sig| sig == target)
         .unwrap_or_else(|| panic!("no face with signature {target:?}"));
-    polyhedron.render.face_colors[i]
+    polyhedron.face_coloring.colors[i]
 }
 
 #[test]
