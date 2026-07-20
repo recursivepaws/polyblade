@@ -52,11 +52,11 @@ impl FaceColoring {
         self.render_indices = dense_color_indices(&self.colors);
     }
 
-    /// Matches faces to a pre-mutation ancestry snapshot by Jaccard similarity, not raw overlap (which can let an inflated ancestor set beat a true match).
+    /// Matches faces to a pre-mutation ancestry snapshot by Jaccard similarity.
     /// Results are then majority-voted per `FaceTypeSignature` to guarantee one color per facetype.
     ///
-    /// `ancestors` is the post-mutation ancestry, one entry per current face; the pre-mutation
-    /// baseline it's matched against is whatever `snapshot` last recorded.
+    /// `ancestors` is the post-mutation ancestry, one entry per current face.
+    /// The pre-mutation baseline it's matched against is whatever `snapshot` last recorded.
     pub fn reconcile(&mut self, ancestors: Vec<HashSet<u64>>, signatures: &[FaceTypeSignature]) {
         let old = &self.cache;
 
