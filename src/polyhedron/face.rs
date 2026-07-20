@@ -1,9 +1,9 @@
 use std::collections::HashSet;
 
 #[derive(Debug, Default, Clone, PartialEq)]
-pub struct FaceCache {
-    pub ancestors: Vec<HashSet<u64>>,
-    pub colors: Vec<usize>,
+struct FaceCache {
+    ancestors: Vec<HashSet<u64>>,
+    colors: Vec<usize>,
 }
 
 /// Per-face color bookkeeping, kept separate from `Render` since it tracks facetype identity, not physical simulation state.
@@ -12,11 +12,11 @@ pub struct FaceColoring {
     /// Palette-relative color slot per current face, parallel to `shape.cycles`.
     pub colors: Vec<usize>,
     /// Next unused color slot; monotonically increasing so new facetypes get distinct colors.
-    pub next_color_slot: usize,
+    next_color_slot: usize,
     /// Dense render index per face, derived from `colors`; kept in sync wherever `colors` is set.
     pub render_indices: Vec<usize>,
     /// Pre-mutation snapshot of ancestors/colors, used to reconcile colors across a structural change.
-    pub cache: FaceCache,
+    cache: FaceCache,
 }
 
 /// A face's "type": side count plus its neighbors' sorted side-count multiset.
@@ -54,18 +54,19 @@ impl FaceColoring {
 
     /// Matches faces to a pre-mutation ancestry snapshot by Jaccard similarity, not raw overlap (which can let an inflated ancestor set beat a true match).
     /// Results are then majority-voted per `FaceTypeSignature` to guarantee one color per facetype.
+    ///
+    /// `ancestors` is the post-mutation ancestry, one entry per current face; the pre-mutation
+    /// baseline it's matched against is whatever `snapshot` last recorded.
     pub fn reconcile(&mut self, ancestors: Vec<HashSet<u64>>, signatures: &[FaceTypeSignature]) {
-        let old = self.cache.clone();
-        self.snapshot(ancestors);
-        let new = self.cache.clone();
+        let old = &self.cache;
 
         // (new_face, old_face, intersection, union) per candidate pair with any overlap.
         let mut candidates: Vec<(usize, usize, usize, usize)> = Vec::new();
-        for (i, ancestors) in new.ancestors.iter().enumerate() {
-            for (j, old) in old.ancestors.iter().enumerate() {
-                let intersection = old.intersection(ancestors).count();
+        for (i, a) in ancestors.iter().enumerate() {
+            for (j, o) in old.ancestors.iter().enumerate() {
+                let intersection = o.intersection(a).count();
                 if intersection > 0 {
-                    let union = old.union(ancestors).count();
+                    let union = o.union(a).count();
                     candidates.push((i, j, intersection, union));
                 }
             }
@@ -77,7 +78,7 @@ impl FaceColoring {
             jaccard_b.total_cmp(&jaccard_a).then(ib.cmp(&ia))
         });
 
-        let mut matched_color: Vec<Option<usize>> = vec![None; new.ancestors.len()];
+        let mut matched_color: Vec<Option<usize>> = vec![None; ancestors.len()];
         let mut old_claimed = vec![false; old.ancestors.len()];
         for (i, j, ..) in candidates {
             if matched_color[i].is_none() && !old_claimed[j] {
@@ -95,7 +96,7 @@ impl FaceColoring {
             }
         }
 
-        let mut new_colors = vec![0; new.ancestors.len()];
+        let mut new_colors = vec![0; ancestors.len()];
         for (_, members) in &groups {
             let mut votes: Vec<(Option<usize>, usize)> = Vec::new();
             for &i in members {
