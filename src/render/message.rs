@@ -279,19 +279,19 @@ impl ProcessMessage<AppState> for PolybladeMessage {
             Tick(time) => {
                 state.update_state(*time);
 
-                let options = state.model.polyhedron.schlegel_face_options();
-                let face_index = state
-                    .render
-                    .schlegel_face
-                    .as_ref()
-                    .and_then(|sig| options.iter().find(|o| &o.signature == sig))
-                    .or_else(|| options.first())
-                    .map(|o| o.face_index)
-                    .unwrap_or(0);
-                state.render.schlegel_active_face_index = face_index;
-                publish_schlegel_face_options(options);
-
                 if state.render.schlegel {
+                    let options = state.model.polyhedron.schlegel_face_options();
+                    let face_index = state
+                        .render
+                        .schlegel_face
+                        .as_ref()
+                        .and_then(|sig| options.iter().find(|o| &o.signature == sig))
+                        .or_else(|| options.first())
+                        .map(|o| o.face_index)
+                        .unwrap_or(0);
+                    state.render.schlegel_active_face_index = face_index;
+                    publish_schlegel_face_options(options);
+
                     let safe_offset = state
                         .model
                         .polyhedron

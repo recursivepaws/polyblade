@@ -67,6 +67,19 @@ pub struct Polyhedron {
     face_colors: Vec<usize>,
     /// Next unused color slot; monotonically increasing so new facetypes get distinct colors.
     next_color_slot: usize,
+    /// Dense render index per face, derived from `face_colors`; kept in sync wherever `face_colors` is set.
+    render_color_indices: Vec<usize>,
+}
+
+/// Maps `face_colors`'s ever-growing values to a dense render index, so two facetypes never collide merely by being congruent mod `colors.len()`.
+fn dense_color_indices(face_colors: &[usize]) -> Vec<usize> {
+    let mut distinct = face_colors.to_vec();
+    distinct.sort_unstable();
+    distinct.dedup();
+    face_colors
+        .iter()
+        .map(|slot| distinct.binary_search(slot).unwrap())
+        .collect()
 }
 
 impl Polyhedron {
@@ -341,13 +354,8 @@ impl Polyhedron {
     /// Groups all faces into distinct "types" by (side_count, neighbor side-count multiset).
     /// Faces are visited in priority order, so the group containing face 0 is always first.
     pub fn schlegel_face_options(&self) -> Vec<FaceTypeOption> {
-        let neighbor_sides = self.shape.cycles.neighbor_signatures();
         let mut options: Vec<FaceTypeOption> = Vec::new();
-        for (face_index, cycle) in self.shape.cycles.iter().enumerate() {
-            let signature = FaceTypeSignature {
-                side_count: cycle.len(),
-                neighbor_sides: neighbor_sides[face_index].clone(),
-            };
+        for (face_index, signature) in self.face_signatures().into_iter().enumerate() {
             if let Some(existing) = options.iter_mut().find(|o| o.signature == signature) {
                 existing.count += 1;
             } else {
@@ -546,23 +554,13 @@ impl Polyhedron {
         }
 
         self.face_colors = new_colors;
+        self.render_color_indices = dense_color_indices(&self.face_colors);
         // Reset ancestry now so it never accumulates past one operation (see `Distance::reset_ancestry`).
         self.shape.reset_ancestry();
     }
 
-    /// Maps `face_colors`'s ever-growing values to a dense render index, so two facetypes never collide merely by being congruent mod `colors.len()`.
-    fn render_color_indices(&self) -> Vec<usize> {
-        let mut distinct = self.face_colors.clone();
-        distinct.sort_unstable();
-        distinct.dedup();
-        self.face_colors
-            .iter()
-            .map(|slot| distinct.binary_search(slot).unwrap())
-            .collect()
-    }
-
     pub fn moment_vertices(&self, colors: &[crate::render::color::RGBA]) -> Vec<MomentVertex> {
-        let render_colors = self.render_color_indices();
+        let render_colors = &self.render_color_indices;
         let Polyhedron { shape, render, .. } = self;
 
         shape

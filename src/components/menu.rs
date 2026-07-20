@@ -60,7 +60,10 @@ fn SchlegelFaceMenu() -> Element {
 
     use_future(move || async move {
         loop {
-            options.set(schlegel_face_options());
+            let new_options = schlegel_face_options();
+            if new_options != *options.peek() {
+                options.set(new_options);
+            }
             cfg_if! {
                 if #[cfg(target_arch = "wasm32")] {
                     polyblade::next_animation_frame().await;

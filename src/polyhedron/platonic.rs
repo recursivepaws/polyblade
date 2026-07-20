@@ -25,6 +25,7 @@ impl Polyhedron {
                     transactions: vec![],
                     face_colors: vec![],
                     next_color_slot: 0,
+                    render_color_indices: vec![],
                 }
             }
         };
@@ -32,6 +33,7 @@ impl Polyhedron {
         // Otherwise e.g. octahedron's internal construction-time ambo leaks into the user's first op.
         polyhedron.shape.reset_ancestry();
         (polyhedron.face_colors, polyhedron.next_color_slot) = polyhedron.bootstrap_face_colors();
+        polyhedron.render_color_indices = dense_color_indices(&polyhedron.face_colors);
         polyhedron
     }
 
