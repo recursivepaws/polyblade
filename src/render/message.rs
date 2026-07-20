@@ -1,6 +1,9 @@
 use crate::{
     Instant,
-    polyhedron::{FaceTypeOption, FaceTypeSignature, Polyhedron, Transaction},
+    polyhedron::{
+        Polyhedron, Transaction,
+        face::{FaceTypeOption, FaceTypeSignature},
+    },
     render::{camera::Camera, color::RGBA},
 };
 use std::fmt::Display;

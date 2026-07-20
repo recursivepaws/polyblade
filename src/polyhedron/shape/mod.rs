@@ -59,13 +59,19 @@ impl Shape {
     }
 
     /// Union of a face's vertices' ancestor sets.
-    pub fn face_ancestors(&self, face_index: usize) -> HashSet<u64> {
+    fn face_ancestors(&self, face_index: usize) -> HashSet<u64> {
         self.cycles[face_index]
             .iter()
             .fold(HashSet::new(), |mut acc, &v| {
                 acc.extend(self.distance.ancestors(v));
                 acc
             })
+    }
+
+    pub fn ancestors(&self) -> Vec<HashSet<u64>> {
+        (0..self.cycles.len())
+            .map(|i| self.face_ancestors(i))
+            .collect()
     }
 
     /// Wipes vertex ancestry back to a fresh singleton tag per current vertex; see `Distance::reset_ancestry`.

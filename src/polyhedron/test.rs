@@ -1,6 +1,5 @@
 use super::*;
 use crate::render::message::PresetMessage::{self, *};
-use std::collections::HashSet;
 use std::fs::create_dir_all;
 //
 
@@ -46,12 +45,9 @@ fn ambo() {
 }
 
 fn apply_ambo(polyhedron: &mut Polyhedron) {
-    let old_face_ancestors: Vec<HashSet<u64>> = (0..polyhedron.shape.cycles.len())
-        .map(|i| polyhedron.shape.face_ancestors(i))
-        .collect();
-    let old_face_colors = polyhedron.face_colors.clone();
+    polyhedron.cache_faces();
     polyhedron.ambo_contract();
-    polyhedron.reconcile_face_colors(&old_face_ancestors, &old_face_colors);
+    polyhedron.reconcile_face_colors();
 }
 
 /// Every face sharing a `FaceTypeSignature` must share a color.
@@ -59,7 +55,7 @@ fn assert_uniform_colors_per_facetype(polyhedron: &Polyhedron) {
     let signatures = polyhedron.face_signatures();
     let mut seen: Vec<(FaceTypeSignature, usize)> = Vec::new();
     for (i, sig) in signatures.iter().enumerate() {
-        let color = polyhedron.face_colors[i];
+        let color = polyhedron.render.face_colors[i];
         match seen.iter().find(|(s, _)| s == sig) {
             Some((_, expected)) => {
                 assert_eq!(
@@ -79,7 +75,7 @@ fn color_for_signature(polyhedron: &Polyhedron, target: &FaceTypeSignature) -> u
         .iter()
         .position(|sig| sig == target)
         .unwrap_or_else(|| panic!("no face with signature {target:?}"));
-    polyhedron.face_colors[i]
+    polyhedron.render.face_colors[i]
 }
 
 #[test]

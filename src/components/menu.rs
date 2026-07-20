@@ -1,6 +1,6 @@
 use cfg_if::cfg_if;
 use dioxus::prelude::*;
-use polyblade::polyhedron::FaceTypeOption;
+use polyblade::polyhedron::face::FaceTypeOption;
 use polyblade::render::message::{
     ConwayMessage, PolybladeMessage, PresetMessage, RenderMessage, push_message,
     schlegel_face_options,

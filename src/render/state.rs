@@ -1,6 +1,6 @@
 use crate::{
     Instant,
-    polyhedron::{FaceTypeSignature, Polyhedron},
+    polyhedron::{Polyhedron, face::FaceTypeSignature},
     render::{
         camera::Camera,
         color::RGBA,

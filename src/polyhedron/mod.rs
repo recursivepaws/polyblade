@@ -1,4 +1,5 @@
 mod conway;
+pub mod face;
 mod platonic;
 mod render;
 mod shape;
@@ -10,9 +11,10 @@ pub use transaction::*;
 #[cfg(test)]
 mod test;
 
-use std::{collections::HashSet, time::Duration};
+use std::time::Duration;
 
 use crate::Instant;
+use crate::polyhedron::face::{FaceCache, FaceTypeOption, FaceTypeSignature};
 use crate::render::{
     camera::Camera,
     message::{ConwayMessage, PresetMessage},
@@ -36,23 +38,6 @@ const SCHLEGEL_CONTAINMENT_MARGIN: f32 = 0.9;
 /// Depth epsilon for the containment check, scaled to the face's inradius to avoid flicker.
 const SCHLEGEL_DEPTH_EPSILON_FACTOR: f32 = 0.02;
 
-/// A face's "type": side count plus its neighbors' sorted side-count multiset.
-/// Stable across structural changes, unlike a raw face index.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct FaceTypeSignature {
-    pub side_count: usize,
-    pub neighbor_sides: Vec<usize>,
-}
-
-/// One distinct face "type" available to project through in Schlegel mode.
-#[derive(Debug, Clone, PartialEq)]
-pub struct FaceTypeOption {
-    pub face_index: usize,
-    pub signature: FaceTypeSignature,
-    pub count: usize,
-    pub label: String,
-}
-
 #[derive(Debug, Clone)]
 pub struct Polyhedron {
     /// Conway Polyhedron Notation
@@ -63,12 +48,6 @@ pub struct Polyhedron {
     pub render: Render,
     /// Transaction queue
     pub transactions: Vec<Transaction>,
-    /// Palette-relative color slot per current face, parallel to `shape.cycles`.
-    face_colors: Vec<usize>,
-    /// Next unused color slot; monotonically increasing so new facetypes get distinct colors.
-    next_color_slot: usize,
-    /// Dense render index per face, derived from `face_colors`; kept in sync wherever `face_colors` is set.
-    render_color_indices: Vec<usize>,
 }
 
 /// Maps `face_colors`'s ever-growing values to a dense render index, so two facetypes never collide merely by being congruent mod `colors.len()`.
@@ -94,7 +73,6 @@ impl Polyhedron {
             n => n * 3,
         }
     }
-
     /// A face's `[start, end)` vertex range in the vertex buffers, for hiding it in Schlegel mode.
     pub fn face_vertex_range(&self, face_index: usize) -> (u32, u32) {
         let start: usize = self
@@ -108,6 +86,13 @@ impl Polyhedron {
         (start as u32, end as u32)
     }
 
+    pub fn cache_faces(&mut self) {
+        self.render.face_cache = FaceCache {
+            ancestors: self.shape.ancestors(),
+            colors: self.render.face_colors.clone(),
+        };
+    }
+
     pub fn process_transactions(&mut self, _speed: f32) {
         if let Some(transaction) = self.transactions.first().cloned() {
             use Transaction::*;
@@ -119,17 +104,14 @@ impl Polyhedron {
                         .any(|l| l > 0.05);
 
                     if all_completed {
-                        let old_face_ancestors: Vec<HashSet<u64>> = (0..self.shape.cycles.len())
-                            .map(|i| self.shape.face_ancestors(i))
-                            .collect();
-                        let old_face_colors = self.face_colors.clone();
+                        self.cache_faces();
 
                         // Contract them in the graph
                         self.shape.contract_edges(edges.clone());
                         self.render.contract_edges(edges);
                         self.transactions.remove(0);
 
-                        self.reconcile_face_colors(&old_face_ancestors, &old_face_colors);
+                        self.reconcile_face_colors();
                     }
                 }
                 Release(edges) => {
@@ -141,10 +123,7 @@ impl Polyhedron {
                     use ConwayMessage::*;
                     use Transaction::*;
 
-                    let old_face_ancestors: Vec<HashSet<u64>> = (0..self.shape.cycles.len())
-                        .map(|i| self.shape.face_ancestors(i))
-                        .collect();
-                    let old_face_colors = self.face_colors.clone();
+                    self.cache_faces();
 
                     let new_transactions = match conway {
                         Dual => {
@@ -217,10 +196,11 @@ impl Polyhedron {
                             ]
                         }
                     };
+
                     self.render.new_capacity(self.shape.order());
                     self.transactions = [new_transactions, self.transactions.clone()].concat();
 
-                    self.reconcile_face_colors(&old_face_ancestors, &old_face_colors);
+                    self.reconcile_face_colors();
                 }
                 Name(c) => {
                     if c == 'b' {
@@ -486,20 +466,17 @@ impl Polyhedron {
 
     /// Matches faces to a pre-mutation ancestry snapshot by Jaccard similarity, not raw overlap (which can let an inflated ancestor set beat a true match).
     /// Results are then majority-voted per `FaceTypeSignature` to guarantee one color per facetype.
-    fn reconcile_face_colors(
-        &mut self,
-        old_face_ancestors: &[HashSet<u64>],
-        old_face_colors: &[usize],
-    ) {
+    fn reconcile_face_colors(&mut self) {
+        let old = self.render.face_cache.clone();
+        self.cache_faces();
+        let new = self.render.face_cache.clone();
+
         let signatures = self.face_signatures();
-        let new_ancestors: Vec<HashSet<u64>> = (0..self.shape.cycles.len())
-            .map(|i| self.shape.face_ancestors(i))
-            .collect();
 
         // (new_face, old_face, intersection, union) per candidate pair with any overlap.
         let mut candidates: Vec<(usize, usize, usize, usize)> = Vec::new();
-        for (i, ancestors) in new_ancestors.iter().enumerate() {
-            for (j, old) in old_face_ancestors.iter().enumerate() {
+        for (i, ancestors) in new.ancestors.iter().enumerate() {
+            for (j, old) in old.ancestors.iter().enumerate() {
                 let intersection = old.intersection(ancestors).count();
                 if intersection > 0 {
                     let union = old.union(ancestors).count();
@@ -514,11 +491,11 @@ impl Polyhedron {
             jaccard_b.total_cmp(&jaccard_a).then(ib.cmp(&ia))
         });
 
-        let mut matched_color: Vec<Option<usize>> = vec![None; new_ancestors.len()];
-        let mut old_claimed = vec![false; old_face_ancestors.len()];
+        let mut matched_color: Vec<Option<usize>> = vec![None; new.ancestors.len()];
+        let mut old_claimed = vec![false; old.ancestors.len()];
         for (i, j, ..) in candidates {
             if matched_color[i].is_none() && !old_claimed[j] {
-                matched_color[i] = Some(old_face_colors[j]);
+                matched_color[i] = Some(old.colors[j]);
                 old_claimed[j] = true;
             }
         }
@@ -532,7 +509,7 @@ impl Polyhedron {
             }
         }
 
-        let mut new_colors = vec![0; new_ancestors.len()];
+        let mut new_colors = vec![0; new.ancestors.len()];
         for (_, members) in &groups {
             let mut votes: Vec<(Option<usize>, usize)> = Vec::new();
             for &i in members {
@@ -544,8 +521,8 @@ impl Polyhedron {
             let winner = votes.iter().max_by_key(|(_, count)| *count).unwrap().0;
 
             let color = winner.unwrap_or_else(|| {
-                let slot = self.next_color_slot;
-                self.next_color_slot += 1;
+                let slot = self.render.next_color_slot;
+                self.render.next_color_slot += 1;
                 slot
             });
             for &i in members {
@@ -553,14 +530,14 @@ impl Polyhedron {
             }
         }
 
-        self.face_colors = new_colors;
-        self.render_color_indices = dense_color_indices(&self.face_colors);
+        self.render.face_colors = new_colors;
+        self.render.render_color_indices = dense_color_indices(&self.render.face_colors);
         // Reset ancestry now so it never accumulates past one operation (see `Distance::reset_ancestry`).
         self.shape.reset_ancestry();
     }
 
     pub fn moment_vertices(&self, colors: &[crate::render::color::RGBA]) -> Vec<MomentVertex> {
-        let render_colors = &self.render_color_indices;
+        let render_colors = &self.render.render_color_indices;
         let Polyhedron { shape, render, .. } = self;
 
         shape

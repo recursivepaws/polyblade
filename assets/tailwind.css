@@ -596,10 +596,6 @@ video {
   position: fixed;
 }
 
-.relative {
-  position: relative;
-}
-
 .isolate {
   isolation: isolate;
 }
