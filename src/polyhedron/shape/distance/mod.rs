@@ -66,6 +66,8 @@ impl Distance {
     }
 
     /// Inserts a new, genuinely-unrelated vertex in the matrix, with a fresh ancestor tag.
+    /// TODO: determine if we still even want this now that we're doing insert_from
+    #[allow(dead_code)]
     pub fn insert(&mut self) -> VertexId {
         let v = self.insert_from(&[]);
         self.ancestors[v].insert(self.next_tag);
