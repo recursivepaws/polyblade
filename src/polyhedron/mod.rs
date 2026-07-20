@@ -36,8 +36,8 @@ const SCHLEGEL_CONTAINMENT_MARGIN: f32 = 0.9;
 /// Depth epsilon for the containment check, scaled to the face's inradius to avoid flicker.
 const SCHLEGEL_DEPTH_EPSILON_FACTOR: f32 = 0.02;
 
-/// Identity of a Schlegel face "type": its side count plus the sorted multiset of its
-/// neighboring faces' side counts. Stable across structural changes, unlike a raw face index.
+/// A face's "type": side count plus its neighbors' sorted side-count multiset.
+/// Stable across structural changes, unlike a raw face index.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct FaceTypeSignature {
     pub side_count: usize,
@@ -65,8 +65,7 @@ pub struct Polyhedron {
     pub transactions: Vec<Transaction>,
     /// Palette-relative color slot per current face, parallel to `shape.cycles`.
     face_colors: Vec<usize>,
-    /// Next never-yet-used color slot, monotonically increasing so concurrently created
-    /// face groups (e.g. expand's new triangles vs. new squares) get visually distinct colors.
+    /// Next unused color slot; monotonically increasing so new facetypes get distinct colors.
     next_color_slot: usize,
 }
 
@@ -83,8 +82,7 @@ impl Polyhedron {
         }
     }
 
-    /// The `[start, end)` vertex range a face occupies in the moment/shape vertex buffers
-    /// (which are laid out in `shape.cycles` order), used to hide it in Schlegel mode.
+    /// A face's `[start, end)` vertex range in the vertex buffers, for hiding it in Schlegel mode.
     pub fn face_vertex_range(&self, face_index: usize) -> (u32, u32) {
         let start: usize = self
             .shape
@@ -340,9 +338,8 @@ impl Polyhedron {
             .fold(f32::MAX, f32::min)
     }
 
-    /// Groups all faces into distinct "types" by (side_count, neighbor side-count multiset), for
-    /// the Schlegel outer-face picker. Faces are visited in existing priority order, so the group
-    /// containing the auto-selected face 0 is always first.
+    /// Groups all faces into distinct "types" by (side_count, neighbor side-count multiset).
+    /// Faces are visited in priority order, so the group containing face 0 is always first.
     pub fn schlegel_face_options(&self) -> Vec<FaceTypeOption> {
         let neighbor_sides = self.shape.cycles.neighbor_signatures();
         let mut options: Vec<FaceTypeOption> = Vec::new();
@@ -464,10 +461,8 @@ impl Polyhedron {
             .collect()
     }
 
-    /// Fresh, no-history color assignment: distinct signatures sorted into a canonical order
-    /// (deterministic, not dependent on cycle iteration order), one slot per distinct class so
-    /// types sharing a side count still get distinct colors. Used when there's no prior shape
-    /// to preserve color continuity from (construction time).
+    /// Fresh, no-history color assignment: one slot per distinct signature, sorted canonically.
+    /// Used when there's no prior shape to preserve continuity from (construction time).
     fn bootstrap_face_colors(&self) -> (Vec<usize>, usize) {
         let signatures = self.face_signatures();
         let mut distinct = signatures.clone();
@@ -481,22 +476,8 @@ impl Polyhedron {
         (face_colors, next_color_slot)
     }
 
-    /// Matches each current face against a pre-mutation snapshot of every face's vertex
-    /// ancestry, as a one-to-one assignment (strongest match claims its old face first) rather
-    /// than each new face picking independently. Ranked by Jaccard similarity (intersection over
-    /// union), not raw overlap count: contracting an edge unions its two endpoints' ancestry into
-    /// the survivor, so ancestry keeps compounding over repeated operations, and a face whose
-    /// ancestry has grown large (e.g. Ambo's vertex-figure faces, built from several contractions)
-    /// can end up *containing* an unrelated old face's entire (smaller) ancestor set — a raw
-    /// overlap count tied with, or exceeding, a genuine exact match elsewhere. Jaccard correctly
-    /// scores that containment lower than a true match (where the two sets are equal, Jaccard 1.0),
-    /// since the inflated set's much larger union size dilutes the score.
-    ///
-    /// Per-face matching alone only usually agrees within a facetype, though — nothing
-    /// structurally guarantees it. So faces are then grouped by `FaceTypeSignature` and each
-    /// group takes a majority vote over what its members individually matched, applying the
-    /// winner (a fresh color if "no match" wins) to every member uniformly. Every face of the
-    /// same facetype is therefore guaranteed the same color, not just usually consistent.
+    /// Matches faces to a pre-mutation ancestry snapshot by Jaccard similarity, not raw overlap (which can let an inflated ancestor set beat a true match).
+    /// Results are then majority-voted per `FaceTypeSignature` to guarantee one color per facetype.
     fn reconcile_face_colors(
         &mut self,
         old_face_ancestors: &[HashSet<u64>],
@@ -534,8 +515,7 @@ impl Polyhedron {
             }
         }
 
-        // Group by facetype and take a majority vote, so every face of the same facetype ends
-        // up with the same color regardless of any individual-match noise.
+        // Group by facetype and majority-vote one color per group.
         let mut groups: Vec<(FaceTypeSignature, Vec<usize>)> = Vec::new();
         for (i, sig) in signatures.iter().enumerate() {
             match groups.iter_mut().find(|(s, _)| s == sig) {
@@ -566,19 +546,11 @@ impl Polyhedron {
         }
 
         self.face_colors = new_colors;
-        // Bound ancestor-set growth to one operation's worth of information (see
-        // `Distance::reset_ancestry`) rather than letting it accumulate across the whole session.
+        // Reset ancestry now so it never accumulates past one operation (see `Distance::reset_ancestry`).
         self.shape.reset_ancestry();
     }
 
-    /// Maps `face_colors`'s persistent (possibly large/sparse, since it only ever grows via
-    /// `next_color_slot`) identity values down to a dense render index (0, 1, 2, ...) over just
-    /// the distinct values present right now. `face_colors` alone is not safe to index into a
-    /// palette directly: two facetypes whose identity values happen to be congruent mod
-    /// `colors.len()` (entirely possible once `next_color_slot` has grown past the palette size
-    /// over several structural changes) would render identically even with unused palette
-    /// entries free. Recomputed fresh whenever colors are needed rather than cached, so it can
-    /// never go stale relative to `face_colors`.
+    /// Maps `face_colors`'s ever-growing values to a dense render index, so two facetypes never collide merely by being congruent mod `colors.len()`.
     fn render_color_indices(&self) -> Vec<usize> {
         let mut distinct = self.face_colors.clone();
         distinct.sort_unstable();

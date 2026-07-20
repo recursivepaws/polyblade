@@ -74,9 +74,7 @@ fn Navbar() -> Element {
     }
 }
 
-/// Shift+letter selects a preset.
-/// A bare letter triggers a Conway operation.
-/// `x` toggles Schlegel mode.
+/// Shift+letter selects a preset, a bare letter triggers a Conway op, and `x` toggles Schlegel mode.
 /// Case-insensitive.
 fn handle_key(evt: Event<KeyboardData>, schlegel: &mut Signal<bool>) {
     use dioxus::html::Key;
@@ -198,8 +196,7 @@ pub fn PolyhedronCanvas() -> Element {
         } else if #[cfg(feature = "native")] {
             let paint_id = dioxus_native::use_wgpu(PolybladePaintSource::new);
 
-            // Blitz only repaints when the DOM changes,
-            // so tick a dummy attribute at ~60fps to keep the animation running.
+            // Blitz only repaints when the DOM changes, so tick a dummy attribute at ~60fps to animate.
             // Stopgap until a proper redraw mechanism is exposed for custom paint sources.
             let mut frame = use_signal(|| 0u64);
             use_future(move || async move {

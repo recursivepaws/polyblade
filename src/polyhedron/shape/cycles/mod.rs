@@ -102,8 +102,7 @@ impl Cycles {
             .concat()
     }
 
-    /// For each face (by index), the sorted multiset of side-counts of faces sharing an edge
-    /// with it. Used to group faces into distinct "types" for the Schlegel face picker.
+    /// For each face, the sorted multiset of its edge-adjacent neighbors' side-counts.
     pub fn neighbor_signatures(&self) -> Vec<Vec<usize>> {
         let cycles: Vec<Vec<VertexId>> = self.cycles.iter().map(|c| c.0.clone()).collect();
         neighbor_type_signatures(&cycles)
@@ -142,8 +141,7 @@ impl Cycles {
     }
 }
 
-/// For each face (by index in `cycles`), the sorted multiset of side-counts of the faces
-/// adjacent to it. Shared by the face-priority sort key below and `Cycles::neighbor_signatures`.
+/// For each face, the sorted multiset of adjacent side-counts; shared by the sort key below and `Cycles::neighbor_signatures`.
 fn neighbor_type_signatures(cycles: &[Vec<VertexId>]) -> Vec<Vec<usize>> {
     let mut edge_faces: HashMap<[VertexId; 2], Vec<usize>> = HashMap::new();
     for (i, cycle) in cycles.iter().enumerate() {

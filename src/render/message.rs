@@ -28,9 +28,8 @@ pub fn drain_messages() -> Vec<PolybladeMessage> {
     std::mem::take(&mut *MESSAGE_QUEUE.lock().unwrap())
 }
 
-/// Distinct Schlegel face-type options for the current polyhedron, republished every tick and
-/// polled by the "Schlegel Face" menu. Symmetric to `MESSAGE_QUEUE` above but flowing the
-/// opposite direction, since the UI has no other way to observe live polyhedron state.
+/// Distinct Schlegel face-type options, republished every tick and polled by the face menu.
+/// Symmetric to `MESSAGE_QUEUE` above but flowing the opposite direction (backend to UI).
 static SCHLEGEL_FACE_OPTIONS: std::sync::Mutex<Vec<FaceTypeOption>> =
     std::sync::Mutex::new(Vec::new());
 

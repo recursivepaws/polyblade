@@ -52,9 +52,8 @@ fn SizedPresetMenu(name: String, make: Callback<usize, PresetMessage>) -> Elemen
     }
 }
 
-/// Polls the backend-published Schlegel face-type options.
-/// Renders one button per distinct type.
-/// Only rendered when schlegel mode is on.
+/// Polls the backend-published Schlegel face-type options, rendering one button per type.
+/// Only rendered when Schlegel mode is on.
 #[component]
 fn SchlegelFaceMenu() -> Element {
     let mut options = use_signal(Vec::<FaceTypeOption>::new);

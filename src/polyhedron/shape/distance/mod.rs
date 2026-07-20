@@ -20,10 +20,7 @@ pub(super) struct Distance {
     /// The order is the number of vertices
     order: usize,
     distance: Vec<usize>,
-    /// Set of persistent tags each vertex descends from. Propagated (not reassigned) across
-    /// splits/merges: unioned into the survivor on a merge, copied as-is to every copy on a
-    /// split, so a face's ancestry survives regardless of which specific vertex copy it ends
-    /// up with.
+    /// Tags each vertex descends from; unioned into the survivor on a merge, copied to every copy on a split.
     ancestors: Vec<HashSet<u64>>,
     /// Next never-yet-used tag, for genuinely new vertices only.
     next_tag: u64,
@@ -76,8 +73,7 @@ impl Distance {
         v
     }
 
-    /// Inserts a new vertex that's a copy/continuation of `parents`, inheriting the union of
-    /// their ancestor sets rather than minting a fresh tag.
+    /// Inserts a new vertex that's a copy of `parents`, inheriting the union of their ancestor sets.
     pub fn insert_from(&mut self, parents: &[VertexId]) -> VertexId {
         self.distance
             .extend([vec![usize::MAX; self.order], vec![0]].concat());
@@ -95,14 +91,8 @@ impl Distance {
         &self.ancestors[v]
     }
 
-    /// Wipes all vertex ancestry back to a fresh singleton tag per current vertex. Matching only
-    /// ever needs to compare the current state against one operation ago, never deeper — so
-    /// resetting right after every successful color reconciliation (and at construction, which
-    /// is really reconciling from nothing) bounds ancestor-set size to the current vertex count
-    /// instead of letting it accumulate, unbounded, across the whole session's operation
-    /// history. Left unbounded, a handful of contractions is enough to saturate a vertex's
-    /// ancestor set to the entire tag universe, at which point otherwise-distinct faces become
-    /// combinatorially indistinguishable by ancestry alone.
+    /// Wipes vertex ancestry back to a fresh singleton tag per current vertex.
+    /// Left unbounded, repeated merges eventually saturate every vertex's tags to the whole original set, making distinct faces indistinguishable by ancestry alone.
     pub fn reset_ancestry(&mut self) {
         self.ancestors = (0..self.order as u64)
             .map(|tag| HashSet::from([tag]))

@@ -58,8 +58,7 @@ impl Shape {
         self.distance.vertices()
     }
 
-    /// Union of a face's vertices' ancestor sets, used to match it against a pre-mutation
-    /// snapshot when Conway ops change which faces exist.
+    /// Union of a face's vertices' ancestor sets.
     pub fn face_ancestors(&self, face_index: usize) -> HashSet<u64> {
         self.cycles[face_index]
             .iter()
@@ -69,8 +68,7 @@ impl Shape {
             })
     }
 
-    /// Wipes vertex ancestry back to a fresh singleton tag per current vertex. See
-    /// `Distance::reset_ancestry` for why this needs to happen after every color reconciliation.
+    /// Wipes vertex ancestry back to a fresh singleton tag per current vertex; see `Distance::reset_ancestry`.
     pub fn reset_ancestry(&mut self) {
         self.distance.reset_ancestry();
     }
