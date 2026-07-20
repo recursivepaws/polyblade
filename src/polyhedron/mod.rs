@@ -38,7 +38,7 @@ const SCHLEGEL_DEPTH_EPSILON_FACTOR: f32 = 0.02;
 
 /// Identity of a Schlegel face "type": its side count plus the sorted multiset of its
 /// neighboring faces' side counts. Stable across structural changes, unlike a raw face index.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct FaceTypeSignature {
     pub side_count: usize,
     pub neighbor_sides: Vec<usize>,
@@ -440,19 +440,33 @@ impl Polyhedron {
     pub fn moment_vertices(&self, colors: &[crate::render::color::RGBA]) -> Vec<MomentVertex> {
         let Polyhedron { shape, render, .. } = self;
 
-        // Polygon side count -> color
-        let color_map: HashMap<usize, Vec4> =
-            shape.cycles.iter().fold(HashMap::new(), |mut acc, c| {
-                if !acc.contains_key(&c.len()) {
-                    acc.insert(c.len(), colors[acc.len() % colors.len()].into());
-                }
-                acc
-            });
+        // Face type (side count + neighbor multiset) -> color.
+        // Signatures are sorted into a canonical order before assignment so the mapping is deterministic.
+        // This is not dependent on cycle iteration order, and distinct types sharing a side count get distinct colors.
+        let neighbor_sides = shape.cycles.neighbor_signatures();
+        let signatures: Vec<FaceTypeSignature> = shape
+            .cycles
+            .iter()
+            .enumerate()
+            .map(|(i, c)| FaceTypeSignature {
+                side_count: c.len(),
+                neighbor_sides: neighbor_sides[i].clone(),
+            })
+            .collect();
+        let mut distinct = signatures.clone();
+        distinct.sort();
+        distinct.dedup();
+        let color_map: HashMap<FaceTypeSignature, Vec4> = distinct
+            .into_iter()
+            .enumerate()
+            .map(|(i, sig)| (sig, colors[i % colors.len()].into()))
+            .collect();
 
         shape
             .cycles
             .iter()
-            .flat_map(|cycle| {
+            .enumerate()
+            .flat_map(|(i, cycle)| {
                 let positions: Vec<Vec3> = match cycle.len() {
                     3 => cycle.iter().map(|&i| render.positions[i]).collect(),
                     4 => [0, 1, 2, 2, 3, 0]
@@ -478,8 +492,7 @@ impl Polyhedron {
                     }
                 };
 
-                // Colors are determined by cycle length
-                let color = color_map[&cycle.len()];
+                let color = color_map[&signatures[i]];
                 // Map into MomentVertices
                 positions
                     .into_iter()
