@@ -10,7 +10,7 @@ pub use transaction::*;
 #[cfg(test)]
 mod test;
 
-use std::{collections::HashMap, time::Duration};
+use std::{collections::HashSet, time::Duration};
 
 use crate::Instant;
 use crate::render::{
@@ -63,6 +63,11 @@ pub struct Polyhedron {
     pub render: Render,
     /// Transaction queue
     pub transactions: Vec<Transaction>,
+    /// Palette-relative color slot per current face, parallel to `shape.cycles`.
+    face_colors: Vec<usize>,
+    /// Next never-yet-used color slot, monotonically increasing so concurrently created
+    /// face groups (e.g. expand's new triangles vs. new squares) get visually distinct colors.
+    next_color_slot: usize,
 }
 
 impl Polyhedron {
@@ -97,23 +102,23 @@ impl Polyhedron {
             use Transaction::*;
             match transaction {
                 Contraction(edges) => {
-                    let Polyhedron {
-                        shape,
-                        render,
-                        transactions,
-                        ..
-                    } = self;
-
                     let all_completed = !edges
                         .iter()
-                        .map(|&[v, u]| render.spring_length([v, u]))
+                        .map(|&[v, u]| self.render.spring_length([v, u]))
                         .any(|l| l > 0.05);
 
                     if all_completed {
+                        let old_face_ancestors: Vec<HashSet<u64>> = (0..self.shape.cycles.len())
+                            .map(|i| self.shape.face_ancestors(i))
+                            .collect();
+                        let old_face_colors = self.face_colors.clone();
+
                         // Contract them in the graph
-                        shape.contract_edges(edges.clone());
-                        render.contract_edges(edges);
-                        transactions.remove(0);
+                        self.shape.contract_edges(edges.clone());
+                        self.render.contract_edges(edges);
+                        self.transactions.remove(0);
+
+                        self.reconcile_face_colors(&old_face_ancestors, &old_face_colors);
                     }
                 }
                 Release(edges) => {
@@ -124,6 +129,12 @@ impl Polyhedron {
                     self.transactions.remove(0);
                     use ConwayMessage::*;
                     use Transaction::*;
+
+                    let old_face_ancestors: Vec<HashSet<u64>> = (0..self.shape.cycles.len())
+                        .map(|i| self.shape.face_ancestors(i))
+                        .collect();
+                    let old_face_colors = self.face_colors.clone();
+
                     let new_transactions = match conway {
                         Dual => {
                             // let edges = self.expand(false);
@@ -197,6 +208,8 @@ impl Polyhedron {
                     };
                     self.render.new_capacity(self.shape.order());
                     self.transactions = [new_transactions, self.transactions.clone()].concat();
+
+                    self.reconcile_face_colors(&old_face_ancestors, &old_face_colors);
                 }
                 Name(c) => {
                     if c == 'b' {
@@ -437,14 +450,10 @@ impl Polyhedron {
         }
     }
 
-    pub fn moment_vertices(&self, colors: &[crate::render::color::RGBA]) -> Vec<MomentVertex> {
-        let Polyhedron { shape, render, .. } = self;
-
-        // Face type (side count + neighbor multiset) -> color.
-        // Signatures are sorted into a canonical order before assignment so the mapping is deterministic.
-        // This is not dependent on cycle iteration order, and distinct types sharing a side count get distinct colors.
-        let neighbor_sides = shape.cycles.neighbor_signatures();
-        let signatures: Vec<FaceTypeSignature> = shape
+    /// Per-face identity (side count + neighbor multiset), in current `shape.cycles` order.
+    fn face_signatures(&self) -> Vec<FaceTypeSignature> {
+        let neighbor_sides = self.shape.cycles.neighbor_signatures();
+        self.shape
             .cycles
             .iter()
             .enumerate()
@@ -452,16 +461,137 @@ impl Polyhedron {
                 side_count: c.len(),
                 neighbor_sides: neighbor_sides[i].clone(),
             })
-            .collect();
+            .collect()
+    }
+
+    /// Fresh, no-history color assignment: distinct signatures sorted into a canonical order
+    /// (deterministic, not dependent on cycle iteration order), one slot per distinct class so
+    /// types sharing a side count still get distinct colors. Used when there's no prior shape
+    /// to preserve color continuity from (construction time).
+    fn bootstrap_face_colors(&self) -> (Vec<usize>, usize) {
+        let signatures = self.face_signatures();
         let mut distinct = signatures.clone();
         distinct.sort();
         distinct.dedup();
-        distinct.reverse();
-        let color_map: HashMap<FaceTypeSignature, Vec4> = distinct
-            .into_iter()
-            .enumerate()
-            .map(|(i, sig)| (sig, colors[i % colors.len()].into()))
+        let next_color_slot = distinct.len();
+        let face_colors = signatures
+            .iter()
+            .map(|sig| distinct.iter().position(|d| d == sig).unwrap())
             .collect();
+        (face_colors, next_color_slot)
+    }
+
+    /// Matches each current face against a pre-mutation snapshot of every face's vertex
+    /// ancestry, as a one-to-one assignment (strongest match claims its old face first) rather
+    /// than each new face picking independently. Ranked by Jaccard similarity (intersection over
+    /// union), not raw overlap count: contracting an edge unions its two endpoints' ancestry into
+    /// the survivor, so ancestry keeps compounding over repeated operations, and a face whose
+    /// ancestry has grown large (e.g. Ambo's vertex-figure faces, built from several contractions)
+    /// can end up *containing* an unrelated old face's entire (smaller) ancestor set — a raw
+    /// overlap count tied with, or exceeding, a genuine exact match elsewhere. Jaccard correctly
+    /// scores that containment lower than a true match (where the two sets are equal, Jaccard 1.0),
+    /// since the inflated set's much larger union size dilutes the score.
+    ///
+    /// Per-face matching alone only usually agrees within a facetype, though — nothing
+    /// structurally guarantees it. So faces are then grouped by `FaceTypeSignature` and each
+    /// group takes a majority vote over what its members individually matched, applying the
+    /// winner (a fresh color if "no match" wins) to every member uniformly. Every face of the
+    /// same facetype is therefore guaranteed the same color, not just usually consistent.
+    fn reconcile_face_colors(
+        &mut self,
+        old_face_ancestors: &[HashSet<u64>],
+        old_face_colors: &[usize],
+    ) {
+        let signatures = self.face_signatures();
+        let new_ancestors: Vec<HashSet<u64>> = (0..self.shape.cycles.len())
+            .map(|i| self.shape.face_ancestors(i))
+            .collect();
+
+        // (new_face, old_face, intersection, union) per candidate pair with any overlap.
+        let mut candidates: Vec<(usize, usize, usize, usize)> = Vec::new();
+        for (i, ancestors) in new_ancestors.iter().enumerate() {
+            for (j, old) in old_face_ancestors.iter().enumerate() {
+                let intersection = old.intersection(ancestors).count();
+                if intersection > 0 {
+                    let union = old.union(ancestors).count();
+                    candidates.push((i, j, intersection, union));
+                }
+            }
+        }
+        // Rank by Jaccard similarity (descending), breaking ties by raw overlap count.
+        candidates.sort_by(|&(_, _, ia, ua), &(_, _, ib, ub)| {
+            let jaccard_a = ia as f64 / ua as f64;
+            let jaccard_b = ib as f64 / ub as f64;
+            jaccard_b.total_cmp(&jaccard_a).then(ib.cmp(&ia))
+        });
+
+        let mut matched_color: Vec<Option<usize>> = vec![None; new_ancestors.len()];
+        let mut old_claimed = vec![false; old_face_ancestors.len()];
+        for (i, j, ..) in candidates {
+            if matched_color[i].is_none() && !old_claimed[j] {
+                matched_color[i] = Some(old_face_colors[j]);
+                old_claimed[j] = true;
+            }
+        }
+
+        // Group by facetype and take a majority vote, so every face of the same facetype ends
+        // up with the same color regardless of any individual-match noise.
+        let mut groups: Vec<(FaceTypeSignature, Vec<usize>)> = Vec::new();
+        for (i, sig) in signatures.iter().enumerate() {
+            match groups.iter_mut().find(|(s, _)| s == sig) {
+                Some((_, members)) => members.push(i),
+                None => groups.push((sig.clone(), vec![i])),
+            }
+        }
+
+        let mut new_colors = vec![0; new_ancestors.len()];
+        for (_, members) in &groups {
+            let mut votes: Vec<(Option<usize>, usize)> = Vec::new();
+            for &i in members {
+                match votes.iter_mut().find(|(v, _)| *v == matched_color[i]) {
+                    Some((_, count)) => *count += 1,
+                    None => votes.push((matched_color[i], 1)),
+                }
+            }
+            let winner = votes.iter().max_by_key(|(_, count)| *count).unwrap().0;
+
+            let color = winner.unwrap_or_else(|| {
+                let slot = self.next_color_slot;
+                self.next_color_slot += 1;
+                slot
+            });
+            for &i in members {
+                new_colors[i] = color;
+            }
+        }
+
+        self.face_colors = new_colors;
+        // Bound ancestor-set growth to one operation's worth of information (see
+        // `Distance::reset_ancestry`) rather than letting it accumulate across the whole session.
+        self.shape.reset_ancestry();
+    }
+
+    /// Maps `face_colors`'s persistent (possibly large/sparse, since it only ever grows via
+    /// `next_color_slot`) identity values down to a dense render index (0, 1, 2, ...) over just
+    /// the distinct values present right now. `face_colors` alone is not safe to index into a
+    /// palette directly: two facetypes whose identity values happen to be congruent mod
+    /// `colors.len()` (entirely possible once `next_color_slot` has grown past the palette size
+    /// over several structural changes) would render identically even with unused palette
+    /// entries free. Recomputed fresh whenever colors are needed rather than cached, so it can
+    /// never go stale relative to `face_colors`.
+    fn render_color_indices(&self) -> Vec<usize> {
+        let mut distinct = self.face_colors.clone();
+        distinct.sort_unstable();
+        distinct.dedup();
+        self.face_colors
+            .iter()
+            .map(|slot| distinct.binary_search(slot).unwrap())
+            .collect()
+    }
+
+    pub fn moment_vertices(&self, colors: &[crate::render::color::RGBA]) -> Vec<MomentVertex> {
+        let render_colors = self.render_color_indices();
+        let Polyhedron { shape, render, .. } = self;
 
         shape
             .cycles
@@ -493,7 +623,7 @@ impl Polyhedron {
                     }
                 };
 
-                let color = color_map[&signatures[i]];
+                let color: Vec4 = colors[render_colors[i] % colors.len()].into();
                 // Map into MomentVertices
                 positions
                     .into_iter()

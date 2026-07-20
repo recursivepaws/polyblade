@@ -2,7 +2,7 @@ mod conway;
 mod cycles;
 mod distance;
 mod platonic;
-use std::{fmt::Display, ops::Range};
+use std::{collections::HashSet, fmt::Display, ops::Range};
 
 use cycles::*;
 use distance::*;
@@ -56,6 +56,23 @@ impl Shape {
 
     pub fn vertices(&self) -> Range<VertexId> {
         self.distance.vertices()
+    }
+
+    /// Union of a face's vertices' ancestor sets, used to match it against a pre-mutation
+    /// snapshot when Conway ops change which faces exist.
+    pub fn face_ancestors(&self, face_index: usize) -> HashSet<u64> {
+        self.cycles[face_index]
+            .iter()
+            .fold(HashSet::new(), |mut acc, &v| {
+                acc.extend(self.distance.ancestors(v));
+                acc
+            })
+    }
+
+    /// Wipes vertex ancestry back to a fresh singleton tag per current vertex. See
+    /// `Distance::reset_ancestry` for why this needs to happen after every color reconciliation.
+    pub fn reset_ancestry(&mut self) {
+        self.distance.reset_ancestry();
     }
 
     pub fn recompute(&mut self) {
