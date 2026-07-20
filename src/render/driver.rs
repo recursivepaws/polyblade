@@ -86,14 +86,15 @@ impl RenderDriver {
                 self.state.render.background_color.into(),
             );
 
-            // Ignore the whole first polygon if we're in schlegel mode
-            let starting_vertex = if self.state.render.schlegel {
-                self.state.model.polyhedron.starting_vertex()
-            } else {
-                0
-            } as u32;
+            // Hide the selected outer face's triangles if we're in schlegel mode
+            let hidden = self.state.render.schlegel.then(|| {
+                self.state
+                    .model
+                    .polyhedron
+                    .face_vertex_range(self.state.render.schlegel_active_face_index)
+            });
 
-            self.scene.draw(starting_vertex, &mut render_pass);
+            self.scene.draw(hidden, &mut render_pass);
         }
         queue.submit(Some(encoder.finish()));
     }

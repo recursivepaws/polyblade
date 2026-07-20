@@ -102,12 +102,24 @@ impl Scene {
         })
     }
 
-    pub fn draw(&self, starting_vertex: u32, pass: &mut wgpu::RenderPass<'_>) {
+    /// Draws every face, except the `[start, end)` vertex range in `hidden`, if given.
+    pub fn draw(&self, hidden: Option<(u32, u32)>, pass: &mut wgpu::RenderPass<'_>) {
         pass.set_pipeline(&self.pipeline);
         pass.set_bind_group(0, &self.uniform_group, &[]);
         pass.set_vertex_buffer(0, self.moment_buf.raw_slice());
         pass.set_vertex_buffer(1, self.shape_buf.raw_slice());
-        pass.draw(starting_vertex..self.shape_buf.len() as u32, 0..1);
+        let len = self.shape_buf.len() as u32;
+        match hidden {
+            Some((start, end)) => {
+                if start > 0 {
+                    pass.draw(0..start, 0..1);
+                }
+                if end < len {
+                    pass.draw(end..len, 0..1);
+                }
+            }
+            None => pass.draw(0..len, 0..1),
+        }
     }
 
     fn build_pipeline(

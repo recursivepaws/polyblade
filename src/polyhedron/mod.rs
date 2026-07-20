@@ -69,12 +69,27 @@ impl Polyhedron {
     pub fn shape_vertices(&self) -> Vec<ShapeVertex> {
         self.shape.cycles.shape_vertices()
     }
-    pub fn starting_vertex(&self) -> VertexId {
-        match self.shape.cycles[0].len() {
+    /// Vertex count a face's triangles occupy in the moment/shape vertex buffers, by side count.
+    fn face_vertex_count(side_count: usize) -> usize {
+        match side_count {
             3 => 3,
             4 => 6,
             n => n * 3,
         }
+    }
+
+    /// The `[start, end)` vertex range a face occupies in the moment/shape vertex buffers
+    /// (which are laid out in `shape.cycles` order), used to hide it in Schlegel mode.
+    pub fn face_vertex_range(&self, face_index: usize) -> (u32, u32) {
+        let start: usize = self
+            .shape
+            .cycles
+            .iter()
+            .take(face_index)
+            .map(|c| Self::face_vertex_count(c.len()))
+            .sum();
+        let end = start + Self::face_vertex_count(self.shape.cycles[face_index].len());
+        (start as u32, end as u32)
     }
 
     pub fn process_transactions(&mut self, _speed: f32) {

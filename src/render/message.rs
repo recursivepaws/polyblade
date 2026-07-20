@@ -289,6 +289,7 @@ impl ProcessMessage<AppState> for PolybladeMessage {
                     .or_else(|| options.first())
                     .map(|o| o.face_index)
                     .unwrap_or(0);
+                state.render.schlegel_active_face_index = face_index;
                 publish_schlegel_face_options(options);
 
                 if state.render.schlegel {

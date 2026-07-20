@@ -35,6 +35,8 @@ pub struct RenderState {
     pub schlegel_eye_offset: f32,
     /// User-picked outer face type; `None` means use the default (auto-selected) face.
     pub schlegel_face: Option<FaceTypeSignature>,
+    /// Face index resolved from `schlegel_face` this tick; the one hidden when drawing.
+    pub schlegel_active_face_index: usize,
     pub line_thickness: f32,
     pub method: ColorMethodMessage,
     pub picker: ColorPickerState,
@@ -62,6 +64,7 @@ impl Default for RenderState {
             schlegel: false,
             schlegel_eye_offset: SCHLEGEL_DEFAULT_EYE_OFFSET,
             schlegel_face: None,
+            schlegel_active_face_index: 0,
             line_thickness: 2.0,
             method: ColorMethodMessage::Polygon,
             picker: ColorPickerState::default(),
