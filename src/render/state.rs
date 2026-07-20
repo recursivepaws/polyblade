@@ -1,6 +1,6 @@
 use crate::{
     Instant,
-    polyhedron::Polyhedron,
+    polyhedron::{FaceTypeSignature, Polyhedron},
     render::{
         camera::Camera,
         color::RGBA,
@@ -33,6 +33,8 @@ pub struct RenderState {
     pub schlegel: bool,
     /// Smoothed toward the safe eye_offset each tick, to damp single-frame geometry noise.
     pub schlegel_eye_offset: f32,
+    /// User-picked outer face type; `None` means use the default (auto-selected) face.
+    pub schlegel_face: Option<FaceTypeSignature>,
     pub line_thickness: f32,
     pub method: ColorMethodMessage,
     pub picker: ColorPickerState,
@@ -59,6 +61,7 @@ impl Default for RenderState {
             rotating: true,
             schlegel: false,
             schlegel_eye_offset: SCHLEGEL_DEFAULT_EYE_OFFSET,
+            schlegel_face: None,
             line_thickness: 2.0,
             method: ColorMethodMessage::Polygon,
             picker: ColorPickerState::default(),

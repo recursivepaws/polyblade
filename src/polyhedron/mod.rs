@@ -33,8 +33,25 @@ const SCHLEGEL_MIN_EYE_OFFSET: f32 = 0.02;
 /// Safety margin applied to the computed containment bound, so vertices sit strictly inside face 0.
 const SCHLEGEL_CONTAINMENT_MARGIN: f32 = 0.9;
 
-/// Depth epsilon for the containment check, scaled to face 0's inradius to avoid flicker.
+/// Depth epsilon for the containment check, scaled to the face's inradius to avoid flicker.
 const SCHLEGEL_DEPTH_EPSILON_FACTOR: f32 = 0.02;
+
+/// Identity of a Schlegel face "type": its side count plus the sorted multiset of its
+/// neighboring faces' side counts. Stable across structural changes, unlike a raw face index.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct FaceTypeSignature {
+    pub side_count: usize,
+    pub neighbor_sides: Vec<usize>,
+}
+
+/// One distinct face "type" available to project through in Schlegel mode.
+#[derive(Debug, Clone, PartialEq)]
+pub struct FaceTypeOption {
+    pub face_index: usize,
+    pub signature: FaceTypeSignature,
+    pub count: usize,
+    pub label: String,
+}
 
 #[derive(Debug, Clone)]
 pub struct Polyhedron {
@@ -276,7 +293,7 @@ impl Polyhedron {
     }
 
     /// Distance from a 2D polygon's local origin to its boundary along a unit direction.
-    /// Used so containment is measured against face 0's true shape, not a circle approximation.
+    /// Used so containment is measured against the face's true shape, not a circle approximation.
     fn polygon_boundary_distance(poly: &[(f32, f32)], dir: (f32, f32)) -> f32 {
         let n = poly.len();
         (0..n)
@@ -295,15 +312,50 @@ impl Polyhedron {
             .fold(f32::MAX, f32::min)
     }
 
-    /// Largest eye_offset for which every vertex still projects inside face 0's true boundary.
+    /// Groups all faces into distinct "types" by (side_count, neighbor side-count multiset), for
+    /// the Schlegel outer-face picker. Faces are visited in existing priority order, so the group
+    /// containing the auto-selected face 0 is always first.
+    pub fn schlegel_face_options(&self) -> Vec<FaceTypeOption> {
+        let neighbor_sides = self.shape.cycles.neighbor_signatures();
+        let mut options: Vec<FaceTypeOption> = Vec::new();
+        for (face_index, cycle) in self.shape.cycles.iter().enumerate() {
+            let signature = FaceTypeSignature {
+                side_count: cycle.len(),
+                neighbor_sides: neighbor_sides[face_index].clone(),
+            };
+            if let Some(existing) = options.iter_mut().find(|o| o.signature == signature) {
+                existing.count += 1;
+            } else {
+                let label = format!(
+                    "{}-gon ({})",
+                    signature.side_count,
+                    signature
+                        .neighbor_sides
+                        .iter()
+                        .map(usize::to_string)
+                        .collect::<Vec<_>>()
+                        .join(",")
+                );
+                options.push(FaceTypeOption {
+                    face_index,
+                    signature,
+                    count: 1,
+                    label,
+                });
+            }
+        }
+        options
+    }
+
+    /// Largest eye_offset for which every vertex still projects inside the chosen face's true boundary.
     /// The depth epsilon is scaled to `inradius` to avoid flicker from simulation noise.
-    pub fn schlegel_safe_eye_offset(&self, requested: f32) -> f32 {
-        let centroid = self.face_centroid(0);
-        let normal = self.face_normal(0);
-        let reference = self.render.positions[self.shape.cycles[0][0]] - centroid;
+    pub fn schlegel_safe_eye_offset(&self, face_index: usize, requested: f32) -> f32 {
+        let centroid = self.face_centroid(face_index);
+        let normal = self.face_normal(face_index);
+        let reference = self.render.positions[self.shape.cycles[face_index][0]] - centroid;
         let u = reference.normalized();
         let v = normal.cross(u).normalized();
-        let polygon: Vec<(f32, f32)> = self.shape.cycles[0]
+        let polygon: Vec<(f32, f32)> = self.shape.cycles[face_index]
             .iter()
             .map(|&i| {
                 let q = self.render.positions[i] - centroid;
@@ -311,10 +363,11 @@ impl Polyhedron {
             })
             .collect();
 
-        let depth_epsilon = self.face_inradius(0, centroid) * SCHLEGEL_DEPTH_EPSILON_FACTOR;
+        let depth_epsilon =
+            self.face_inradius(face_index, centroid) * SCHLEGEL_DEPTH_EPSILON_FACTOR;
         let bound = self.render.positions.iter().fold(f32::MAX, |bound, &p| {
             let q = p - centroid;
-            let depth = -q.dot(normal); // distance behind face 0's plane; convex faces give depth >= 0
+            let depth = -q.dot(normal); // distance behind the face's plane; convex faces give depth >= 0
             let lateral = q - q.dot(normal) * normal;
             let lateral_mag = lateral.mag();
             if depth <= depth_epsilon || lateral_mag < 1e-6 {
@@ -332,18 +385,18 @@ impl Polyhedron {
         (requested.min(bound * SCHLEGEL_CONTAINMENT_MARGIN)).max(SCHLEGEL_MIN_EYE_OFFSET)
     }
 
-    /// Camera for a Schlegel-diagram view through face 0 at a given eye_offset.
-    /// Fitting the FOV to face 0's own circumradius alone is sufficient, given `schlegel_safe_eye_offset`.
-    pub fn schlegel_camera_from_offset(&self, eye_offset: f32) -> Camera {
-        let centroid = self.face_centroid(0);
-        let normal = self.face_normal(0);
-        let reference_vertex = self.render.positions[self.shape.cycles[0][0]];
+    /// Camera for a Schlegel-diagram view through `face_index` at a given eye_offset.
+    /// Fitting the FOV to the face's own circumradius alone is sufficient, given `schlegel_safe_eye_offset`.
+    pub fn schlegel_camera_from_offset(&self, face_index: usize, eye_offset: f32) -> Camera {
+        let centroid = self.face_centroid(face_index);
+        let normal = self.face_normal(face_index);
+        let reference_vertex = self.render.positions[self.shape.cycles[face_index][0]];
 
         let eye = centroid + normal * eye_offset;
         let target = centroid - normal;
         let up = (reference_vertex - centroid).normalized();
 
-        let circumradius = self.shape.cycles[0]
+        let circumradius = self.shape.cycles[face_index]
             .iter()
             .map(|&v| (self.render.positions[v] - centroid).mag())
             .fold(0.0_f32, f32::max);

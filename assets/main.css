@@ -26,6 +26,15 @@ body {
   position: relative;
 }
 
+.menu-group.top-right {
+  margin-left: auto;
+}
+
+.menu-group.top-right .dropdown {
+  left: auto;
+  right: 0;
+}
+
 .menu-btn {
   background: #374151;
   padding: 8px 16px;

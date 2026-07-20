@@ -1,6 +1,9 @@
+use cfg_if::cfg_if;
 use dioxus::prelude::*;
+use polyblade::polyhedron::FaceTypeOption;
 use polyblade::render::message::{
     ConwayMessage, PolybladeMessage, PresetMessage, RenderMessage, push_message,
+    schlegel_face_options,
 };
 use strum::IntoEnumIterator;
 
@@ -49,10 +52,51 @@ fn SizedPresetMenu(name: String, make: Callback<usize, PresetMessage>) -> Elemen
     }
 }
 
+/// Polls the backend-published Schlegel face-type options.
+/// Renders one button per distinct type.
+/// Only rendered when schlegel mode is on.
 #[component]
-pub fn MenuBar() -> Element {
-    let mut schlegel = use_signal(|| false);
+fn SchlegelFaceMenu() -> Element {
+    let mut options = use_signal(Vec::<FaceTypeOption>::new);
 
+    use_future(move || async move {
+        loop {
+            options.set(schlegel_face_options());
+            cfg_if! {
+                if #[cfg(target_arch = "wasm32")] {
+                    polyblade::next_animation_frame().await;
+                } else {
+                    tokio::time::sleep(std::time::Duration::from_millis(16)).await;
+                }
+            }
+        }
+    });
+
+    rsx! {
+        div { class: "menu-group top-right",
+            div { class: "menu-btn", "Schlegel Face" }
+            div { class: "dropdown",
+                for option in options() {
+                    div {
+                        class: "item",
+                        onclick: move |_| {
+                            push_message(
+                                PolybladeMessage::Render(
+                                    RenderMessage::SchlegelFace(option.signature.clone()),
+                                ),
+                            );
+                        },
+                        "{option.label}"
+                        span { class: "shortcut", "×{option.count}" }
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[component]
+pub fn MenuBar(mut schlegel: Signal<bool>) -> Element {
     rsx! {
         div { class: "menu-group",
             div { class: "menu-btn", "Preset" }
@@ -104,6 +148,9 @@ pub fn MenuBar() -> Element {
                     "Schlegel"
                 }
             }
+        }
+        if schlegel() {
+            SchlegelFaceMenu {}
         }
     }
 }

@@ -1,6 +1,8 @@
 use cfg_if::cfg_if;
 use dioxus::prelude::*;
-use polyblade::render::message::{ConwayMessage, PolybladeMessage, PresetMessage, push_message};
+use polyblade::render::message::{
+    ConwayMessage, PolybladeMessage, PresetMessage, RenderMessage, push_message,
+};
 
 mod components;
 use components::MenuBar;
@@ -53,6 +55,8 @@ fn App() -> Element {
 /// Shared navbar component. Also owns keyboard focus so shortcuts work anywhere.
 #[component]
 fn Navbar() -> Element {
+    let mut schlegel = use_signal(|| false);
+
     rsx! {
         div {
             class: "main-div",
@@ -61,22 +65,34 @@ fn Navbar() -> Element {
             onmounted: move |evt| async move {
                 let _ = evt.set_focus(true).await;
             },
-            onkeydown: handle_key,
-            div { class: "menu-bar", MenuBar {} }
+            onkeydown: move |evt| handle_key(evt, &mut schlegel),
+            div { class: "menu-bar",
+                MenuBar { schlegel }
+            }
             Outlet::<Route> {}
         }
     }
 }
 
-/// Shift+letter selects a preset; a bare letter triggers a Conway operation.
+/// Shift+letter selects a preset.
+/// A bare letter triggers a Conway operation.
+/// `x` toggles Schlegel mode.
 /// Case-insensitive.
-fn handle_key(evt: Event<KeyboardData>) {
+fn handle_key(evt: Event<KeyboardData>, schlegel: &mut Signal<bool>) {
     use dioxus::html::Key;
 
     let Key::Character(ch) = evt.key() else {
         return;
     };
     let ch = ch.to_lowercase();
+
+    if !evt.modifiers().shift() && ch == "x" {
+        evt.prevent_default();
+        let next = !schlegel();
+        schlegel.set(next);
+        push_message(PolybladeMessage::Render(RenderMessage::Schlegel(next)));
+        return;
+    }
 
     let msg = if evt.modifiers().shift() {
         use PresetMessage::*;
@@ -182,9 +198,9 @@ pub fn PolyhedronCanvas() -> Element {
         } else if #[cfg(feature = "native")] {
             let paint_id = dioxus_native::use_wgpu(PolybladePaintSource::new);
 
-            // Blitz only repaints when the DOM changes, so tick a dummy
-            // attribute at ~60fps to keep the animation running. Stopgap until
-            // a proper redraw mechanism is exposed for custom paint sources.
+            // Blitz only repaints when the DOM changes,
+            // so tick a dummy attribute at ~60fps to keep the animation running.
+            // Stopgap until a proper redraw mechanism is exposed for custom paint sources.
             let mut frame = use_signal(|| 0u64);
             use_future(move || async move {
                 loop {

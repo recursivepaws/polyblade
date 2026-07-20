@@ -1,6 +1,6 @@
 use crate::{
     Instant,
-    polyhedron::{Polyhedron, Transaction},
+    polyhedron::{FaceTypeOption, FaceTypeSignature, Polyhedron, Transaction},
     render::{camera::Camera, color::RGBA},
 };
 use std::fmt::Display;
@@ -26,6 +26,20 @@ pub fn push_message(msg: PolybladeMessage) {
 
 pub fn drain_messages() -> Vec<PolybladeMessage> {
     std::mem::take(&mut *MESSAGE_QUEUE.lock().unwrap())
+}
+
+/// Distinct Schlegel face-type options for the current polyhedron, republished every tick and
+/// polled by the "Schlegel Face" menu. Symmetric to `MESSAGE_QUEUE` above but flowing the
+/// opposite direction, since the UI has no other way to observe live polyhedron state.
+static SCHLEGEL_FACE_OPTIONS: std::sync::Mutex<Vec<FaceTypeOption>> =
+    std::sync::Mutex::new(Vec::new());
+
+pub fn publish_schlegel_face_options(options: Vec<FaceTypeOption>) {
+    *SCHLEGEL_FACE_OPTIONS.lock().unwrap() = options;
+}
+
+pub fn schlegel_face_options() -> Vec<FaceTypeOption> {
+    SCHLEGEL_FACE_OPTIONS.lock().unwrap().clone()
 }
 
 #[derive(Debug, Clone, Display)]
@@ -113,6 +127,7 @@ pub enum ConwayMessage {
 #[derive(Debug, Clone)]
 pub enum RenderMessage {
     Schlegel(bool),
+    SchlegelFace(FaceTypeSignature),
     Rotating(bool),
     FovChanged(f32),
     ZoomChanged(f32),
@@ -201,6 +216,9 @@ impl ProcessMessage<RenderState> for RenderMessage {
                     state.zoom = 1.0;
                 }
             }
+            SchlegelFace(signature) => {
+                state.schlegel_face = Some(signature.clone());
+            }
             Rotating(rotating) => {
                 state.rotating = *rotating;
                 if !rotating {
@@ -262,11 +280,22 @@ impl ProcessMessage<AppState> for PolybladeMessage {
             Tick(time) => {
                 state.update_state(*time);
 
+                let options = state.model.polyhedron.schlegel_face_options();
+                let face_index = state
+                    .render
+                    .schlegel_face
+                    .as_ref()
+                    .and_then(|sig| options.iter().find(|o| &o.signature == sig))
+                    .or_else(|| options.first())
+                    .map(|o| o.face_index)
+                    .unwrap_or(0);
+                publish_schlegel_face_options(options);
+
                 if state.render.schlegel {
                     let safe_offset = state
                         .model
                         .polyhedron
-                        .schlegel_safe_eye_offset(state.render.zoom);
+                        .schlegel_safe_eye_offset(face_index, state.render.zoom);
                     // Tighten slowly (damps transient spring-settling skew) but relax quickly.
                     let rate = if safe_offset < state.render.schlegel_eye_offset {
                         SCHLEGEL_TIGHTEN_RATE
@@ -279,7 +308,7 @@ impl ProcessMessage<AppState> for PolybladeMessage {
                     state.render.camera = state
                         .model
                         .polyhedron
-                        .schlegel_camera_from_offset(state.render.schlegel_eye_offset);
+                        .schlegel_camera_from_offset(face_index, state.render.schlegel_eye_offset);
                 }
             }
             Preset(preset) => preset.process(&mut state.model),
