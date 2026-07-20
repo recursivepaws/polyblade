@@ -34,7 +34,8 @@ impl Shape {
             .collect();
 
         for cycle in cycles {
-            let v = self.distance.insert();
+            let parents: Vec<VertexId> = cycle.iter().copied().collect();
+            let v = self.distance.insert_from(&parents);
             // let mut vpos = Vec3::zero();
 
             for &u in cycle.iter() {
@@ -54,7 +55,7 @@ impl Shape {
         for cycle in self.cycles.iter() {
             let mut new_face = vec![];
             for &v in cycle.iter() {
-                let u = self.distance.insert();
+                let u = self.distance.insert_from(&[v]);
                 new_face.push(u);
                 self.distance.connect([v, u]);
             }

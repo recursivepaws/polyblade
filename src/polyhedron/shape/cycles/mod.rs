@@ -101,6 +101,12 @@ impl Cycles {
             .collect::<Vec<Vec<ShapeVertex>>>()
             .concat()
     }
+
+    /// For each face, the sorted multiset of its edge-adjacent neighbors' side-counts.
+    pub fn neighbor_signatures(&self) -> Vec<Vec<usize>> {
+        let cycles: Vec<Vec<VertexId>> = self.cycles.iter().map(|c| c.0.clone()).collect();
+        neighbor_type_signatures(&cycles)
+    }
 }
 
 impl Index<usize> for Cycles {
@@ -133,6 +139,38 @@ impl Cycles {
             cycle.replace(old, new);
         }
     }
+}
+
+/// For each face, the sorted multiset of adjacent side-counts; shared by the sort key below and `Cycles::neighbor_signatures`.
+fn neighbor_type_signatures(cycles: &[Vec<VertexId>]) -> Vec<Vec<usize>> {
+    let mut edge_faces: HashMap<[VertexId; 2], Vec<usize>> = HashMap::new();
+    for (i, cycle) in cycles.iter().enumerate() {
+        let n = cycle.len();
+        for k in 0..n {
+            let (a, b) = (cycle[k], cycle[(k + 1) % n]);
+            let edge = if a < b { [a, b] } else { [b, a] };
+            edge_faces.entry(edge).or_default().push(i);
+        }
+    }
+    cycles
+        .iter()
+        .enumerate()
+        .map(|(i, cycle)| {
+            let n = cycle.len();
+            let mut sides: Vec<usize> = (0..n)
+                .filter_map(|k| {
+                    let (a, b) = (cycle[k], cycle[(k + 1) % n]);
+                    let edge = if a < b { [a, b] } else { [b, a] };
+                    edge_faces[&edge]
+                        .iter()
+                        .find(|&&j| j != i)
+                        .map(|&j| cycles[j].len())
+                })
+                .collect();
+            sides.sort_unstable();
+            sides
+        })
+        .collect()
 }
 
 impl From<&Distance> for Cycles {
@@ -179,34 +217,10 @@ impl From<&Distance> for Cycles {
 
         let cycles = cycles.into_iter().collect::<Vec<_>>();
 
-        // Map each undirected edge to the faces sharing it, to score neighborhood uniformity.
-        let mut edge_faces: HashMap<[VertexId; 2], Vec<usize>> = HashMap::new();
-        for (i, cycle) in cycles.iter().enumerate() {
-            let n = cycle.len();
-            for k in 0..n {
-                let (a, b) = (cycle[k], cycle[(k + 1) % n]);
-                let edge = if a < b { [a, b] } else { [b, a] };
-                edge_faces.entry(edge).or_default().push(i);
-            }
-        }
         // Fewer distinct neighbor side-counts means a more locally symmetric/uniform face.
-        let neighbor_uniformity: Vec<usize> = cycles
+        let neighbor_uniformity: Vec<usize> = neighbor_type_signatures(&cycles)
             .iter()
-            .enumerate()
-            .map(|(i, cycle)| {
-                let n = cycle.len();
-                let types: HashSet<usize> = (0..n)
-                    .filter_map(|k| {
-                        let (a, b) = (cycle[k], cycle[(k + 1) % n]);
-                        let edge = if a < b { [a, b] } else { [b, a] };
-                        edge_faces[&edge]
-                            .iter()
-                            .find(|&&j| j != i)
-                            .map(|&j| cycles[j].len())
-                    })
-                    .collect();
-                types.len()
-            })
+            .map(|sig| sig.iter().collect::<HashSet<_>>().len())
             .collect();
 
         let mut scored: Vec<(Vec<VertexId>, usize)> =

@@ -600,6 +600,10 @@ video {
   isolation: isolate;
 }
 
+.hidden {
+  display: none;
+}
+
 .shrink {
   flex-shrink: 1;
 }

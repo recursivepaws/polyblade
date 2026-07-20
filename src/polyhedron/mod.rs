@@ -1,4 +1,5 @@
 mod conway;
+pub mod face;
 mod platonic;
 mod render;
 mod shape;
@@ -10,9 +11,10 @@ pub use transaction::*;
 #[cfg(test)]
 mod test;
 
-use std::{collections::HashMap, time::Duration};
+use std::time::Duration;
 
 use crate::Instant;
+use crate::polyhedron::face::{FaceColoring, FaceTypeOption, FaceTypeSignature};
 use crate::render::{
     camera::Camera,
     message::{ConwayMessage, PresetMessage},
@@ -33,7 +35,7 @@ const SCHLEGEL_MIN_EYE_OFFSET: f32 = 0.02;
 /// Safety margin applied to the computed containment bound, so vertices sit strictly inside face 0.
 const SCHLEGEL_CONTAINMENT_MARGIN: f32 = 0.9;
 
-/// Depth epsilon for the containment check, scaled to face 0's inradius to avoid flicker.
+/// Depth epsilon for the containment check, scaled to the face's inradius to avoid flicker.
 const SCHLEGEL_DEPTH_EPSILON_FACTOR: f32 = 0.02;
 
 #[derive(Debug, Clone)]
@@ -46,18 +48,37 @@ pub struct Polyhedron {
     pub render: Render,
     /// Transaction queue
     pub transactions: Vec<Transaction>,
+    /// Per-face color bookkeeping.
+    pub face_coloring: FaceColoring,
 }
 
 impl Polyhedron {
     pub fn shape_vertices(&self) -> Vec<ShapeVertex> {
         self.shape.cycles.shape_vertices()
     }
-    pub fn starting_vertex(&self) -> VertexId {
-        match self.shape.cycles[0].len() {
+    /// Vertex count a face's triangles occupy in the moment/shape vertex buffers, by side count.
+    fn face_vertex_count(side_count: usize) -> usize {
+        match side_count {
             3 => 3,
             4 => 6,
             n => n * 3,
         }
+    }
+    /// A face's `[start, end)` vertex range in the vertex buffers, for hiding it in Schlegel mode.
+    pub fn face_vertex_range(&self, face_index: usize) -> (u32, u32) {
+        let start: usize = self
+            .shape
+            .cycles
+            .iter()
+            .take(face_index)
+            .map(|c| Self::face_vertex_count(c.len()))
+            .sum();
+        let end = start + Self::face_vertex_count(self.shape.cycles[face_index].len());
+        (start as u32, end as u32)
+    }
+
+    pub fn cache_faces(&mut self) {
+        self.face_coloring.snapshot(self.shape.ancestors());
     }
 
     pub fn process_transactions(&mut self, _speed: f32) {
@@ -65,23 +86,20 @@ impl Polyhedron {
             use Transaction::*;
             match transaction {
                 Contraction(edges) => {
-                    let Polyhedron {
-                        shape,
-                        render,
-                        transactions,
-                        ..
-                    } = self;
-
                     let all_completed = !edges
                         .iter()
-                        .map(|&[v, u]| render.spring_length([v, u]))
+                        .map(|&[v, u]| self.render.spring_length([v, u]))
                         .any(|l| l > 0.05);
 
                     if all_completed {
+                        self.cache_faces();
+
                         // Contract them in the graph
-                        shape.contract_edges(edges.clone());
-                        render.contract_edges(edges);
-                        transactions.remove(0);
+                        self.shape.contract_edges(edges.clone());
+                        self.render.contract_edges(edges);
+                        self.transactions.remove(0);
+
+                        self.reconcile_face_colors();
                     }
                 }
                 Release(edges) => {
@@ -92,6 +110,9 @@ impl Polyhedron {
                     self.transactions.remove(0);
                     use ConwayMessage::*;
                     use Transaction::*;
+
+                    self.cache_faces();
+
                     let new_transactions = match conway {
                         Dual => {
                             // let edges = self.expand(false);
@@ -163,8 +184,11 @@ impl Polyhedron {
                             ]
                         }
                     };
+
                     self.render.new_capacity(self.shape.order());
                     self.transactions = [new_transactions, self.transactions.clone()].concat();
+
+                    self.reconcile_face_colors();
                 }
                 Name(c) => {
                     if c == 'b' {
@@ -276,7 +300,7 @@ impl Polyhedron {
     }
 
     /// Distance from a 2D polygon's local origin to its boundary along a unit direction.
-    /// Used so containment is measured against face 0's true shape, not a circle approximation.
+    /// Used so containment is measured against the face's true shape, not a circle approximation.
     fn polygon_boundary_distance(poly: &[(f32, f32)], dir: (f32, f32)) -> f32 {
         let n = poly.len();
         (0..n)
@@ -295,15 +319,44 @@ impl Polyhedron {
             .fold(f32::MAX, f32::min)
     }
 
-    /// Largest eye_offset for which every vertex still projects inside face 0's true boundary.
+    /// Groups all faces into distinct "types" by (side_count, neighbor side-count multiset).
+    /// Faces are visited in priority order, so the group containing face 0 is always first.
+    pub fn schlegel_face_options(&self) -> Vec<FaceTypeOption> {
+        let mut options: Vec<FaceTypeOption> = Vec::new();
+        for (face_index, signature) in self.face_signatures().into_iter().enumerate() {
+            if let Some(existing) = options.iter_mut().find(|o| o.signature == signature) {
+                existing.count += 1;
+            } else {
+                let label = format!(
+                    "{}-gon ({})",
+                    signature.side_count,
+                    signature
+                        .neighbor_sides
+                        .iter()
+                        .map(usize::to_string)
+                        .collect::<Vec<_>>()
+                        .join(",")
+                );
+                options.push(FaceTypeOption {
+                    face_index,
+                    signature,
+                    count: 1,
+                    label,
+                });
+            }
+        }
+        options
+    }
+
+    /// Largest eye_offset for which every vertex still projects inside the chosen face's true boundary.
     /// The depth epsilon is scaled to `inradius` to avoid flicker from simulation noise.
-    pub fn schlegel_safe_eye_offset(&self, requested: f32) -> f32 {
-        let centroid = self.face_centroid(0);
-        let normal = self.face_normal(0);
-        let reference = self.render.positions[self.shape.cycles[0][0]] - centroid;
+    pub fn schlegel_safe_eye_offset(&self, face_index: usize, requested: f32) -> f32 {
+        let centroid = self.face_centroid(face_index);
+        let normal = self.face_normal(face_index);
+        let reference = self.render.positions[self.shape.cycles[face_index][0]] - centroid;
         let u = reference.normalized();
         let v = normal.cross(u).normalized();
-        let polygon: Vec<(f32, f32)> = self.shape.cycles[0]
+        let polygon: Vec<(f32, f32)> = self.shape.cycles[face_index]
             .iter()
             .map(|&i| {
                 let q = self.render.positions[i] - centroid;
@@ -311,10 +364,11 @@ impl Polyhedron {
             })
             .collect();
 
-        let depth_epsilon = self.face_inradius(0, centroid) * SCHLEGEL_DEPTH_EPSILON_FACTOR;
+        let depth_epsilon =
+            self.face_inradius(face_index, centroid) * SCHLEGEL_DEPTH_EPSILON_FACTOR;
         let bound = self.render.positions.iter().fold(f32::MAX, |bound, &p| {
             let q = p - centroid;
-            let depth = -q.dot(normal); // distance behind face 0's plane; convex faces give depth >= 0
+            let depth = -q.dot(normal); // distance behind the face's plane; convex faces give depth >= 0
             let lateral = q - q.dot(normal) * normal;
             let lateral_mag = lateral.mag();
             if depth <= depth_epsilon || lateral_mag < 1e-6 {
@@ -332,18 +386,18 @@ impl Polyhedron {
         (requested.min(bound * SCHLEGEL_CONTAINMENT_MARGIN)).max(SCHLEGEL_MIN_EYE_OFFSET)
     }
 
-    /// Camera for a Schlegel-diagram view through face 0 at a given eye_offset.
-    /// Fitting the FOV to face 0's own circumradius alone is sufficient, given `schlegel_safe_eye_offset`.
-    pub fn schlegel_camera_from_offset(&self, eye_offset: f32) -> Camera {
-        let centroid = self.face_centroid(0);
-        let normal = self.face_normal(0);
-        let reference_vertex = self.render.positions[self.shape.cycles[0][0]];
+    /// Camera for a Schlegel-diagram view through `face_index` at a given eye_offset.
+    /// Fitting the FOV to the face's own circumradius alone is sufficient, given `schlegel_safe_eye_offset`.
+    pub fn schlegel_camera_from_offset(&self, face_index: usize, eye_offset: f32) -> Camera {
+        let centroid = self.face_centroid(face_index);
+        let normal = self.face_normal(face_index);
+        let reference_vertex = self.render.positions[self.shape.cycles[face_index][0]];
 
         let eye = centroid + normal * eye_offset;
         let target = centroid - normal;
         let up = (reference_vertex - centroid).normalized();
 
-        let circumradius = self.shape.cycles[0]
+        let circumradius = self.shape.cycles[face_index]
             .iter()
             .map(|&v| (self.render.positions[v] - centroid).mag())
             .fold(0.0_f32, f32::max);
@@ -369,22 +423,52 @@ impl Polyhedron {
         }
     }
 
-    pub fn moment_vertices(&self, colors: &[crate::render::color::RGBA]) -> Vec<MomentVertex> {
-        let Polyhedron { shape, render, .. } = self;
+    /// Per-face identity (side count + neighbor multiset), in current `shape.cycles` order.
+    fn face_signatures(&self) -> Vec<FaceTypeSignature> {
+        let neighbor_sides = self.shape.cycles.neighbor_signatures();
+        self.shape
+            .cycles
+            .iter()
+            .enumerate()
+            .map(|(i, c)| FaceTypeSignature {
+                side_count: c.len(),
+                neighbor_sides: neighbor_sides[i].clone(),
+            })
+            .collect()
+    }
 
-        // Polygon side count -> color
-        let color_map: HashMap<usize, Vec4> =
-            shape.cycles.iter().fold(HashMap::new(), |mut acc, c| {
-                if !acc.contains_key(&c.len()) {
-                    acc.insert(c.len(), colors[acc.len() % colors.len()].into());
-                }
-                acc
-            });
+    /// Fresh, no-history color assignment: one slot per distinct signature, sorted canonically.
+    /// Used when there's no prior shape to preserve continuity from (construction time).
+    fn bootstrap_face_colors(&mut self) {
+        let signatures = self.face_signatures();
+        let mut distinct = signatures.clone();
+        distinct.sort();
+        distinct.dedup();
+        let next_color_slot = distinct.len();
+        let face_colors = signatures
+            .iter()
+            .map(|sig| distinct.iter().position(|d| d == sig).unwrap())
+            .collect();
+        self.face_coloring.bootstrap(face_colors, next_color_slot);
+    }
+
+    fn reconcile_face_colors(&mut self) {
+        let ancestors = self.shape.ancestors();
+        let signatures = self.face_signatures();
+        self.face_coloring.reconcile(ancestors, &signatures);
+        // Reset ancestry now so it never accumulates past one operation (see `Distance::reset_ancestry`).
+        self.shape.reset_ancestry();
+    }
+
+    pub fn moment_vertices(&self, colors: &[crate::render::color::RGBA]) -> Vec<MomentVertex> {
+        let render_colors = &self.face_coloring.render_indices;
+        let Polyhedron { shape, render, .. } = self;
 
         shape
             .cycles
             .iter()
-            .flat_map(|cycle| {
+            .enumerate()
+            .flat_map(|(i, cycle)| {
                 let positions: Vec<Vec3> = match cycle.len() {
                     3 => cycle.iter().map(|&i| render.positions[i]).collect(),
                     4 => [0, 1, 2, 2, 3, 0]
@@ -410,8 +494,7 @@ impl Polyhedron {
                     }
                 };
 
-                // Colors are determined by cycle length
-                let color = color_map[&cycle.len()];
+                let color: Vec4 = colors[render_colors[i] % colors.len()].into();
                 // Map into MomentVertices
                 positions
                     .into_iter()

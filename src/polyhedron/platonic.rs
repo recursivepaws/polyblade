@@ -4,7 +4,7 @@ use PresetMessage::*;
 impl Polyhedron {
     pub fn preset(preset: &PresetMessage) -> Polyhedron {
         use PresetMessage::*;
-        match preset {
+        let mut polyhedron = match preset {
             Octahedron => Self::octahedron(),
             Dodecahedron => todo!(),
             Icosahedron => Self::icosahedron(),
@@ -23,9 +23,15 @@ impl Polyhedron {
                     shape,
                     render,
                     transactions: vec![],
+                    face_coloring: FaceColoring::default(),
                 }
             }
-        }
+        };
+        // Bootstrapping is "reconciling from nothing", so reset ancestry here too.
+        // Otherwise e.g. octahedron's internal construction-time ambo leaks into the user's first op.
+        polyhedron.shape.reset_ancestry();
+        polyhedron.bootstrap_face_colors();
+        polyhedron
     }
 
     fn octahedron() -> Polyhedron {
