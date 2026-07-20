@@ -439,7 +439,7 @@ impl Polyhedron {
 
     /// Fresh, no-history color assignment: one slot per distinct signature, sorted canonically.
     /// Used when there's no prior shape to preserve continuity from (construction time).
-    fn bootstrap_face_colors(&self) -> (Vec<usize>, usize) {
+    fn bootstrap_face_colors(&mut self) {
         let signatures = self.face_signatures();
         let mut distinct = signatures.clone();
         distinct.sort();
@@ -449,7 +449,7 @@ impl Polyhedron {
             .iter()
             .map(|sig| distinct.iter().position(|d| d == sig).unwrap())
             .collect();
-        (face_colors, next_color_slot)
+        self.face_coloring.bootstrap(face_colors, next_color_slot);
     }
 
     fn reconcile_face_colors(&mut self) {
