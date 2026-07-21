@@ -42,9 +42,11 @@ impl PaletteAllocator {
         }
         for &slot in present {
             if !self.assigned.contains_key(&slot) {
-                // Exhausted only when live facetypes outnumber the palette; degrade to index 0.
-                debug_assert!(!self.free.is_empty(), "palette exhausted: more facetypes than colors");
-                let palette = self.free.pop_front().unwrap_or(0);
+                // Grow on demand when the palette floor is exhausted; the render site bounds this to the real palette.
+                let palette = match self.free.pop_front() {
+                    Some(p) => p,
+                    None => self.assigned.len(),
+                };
                 self.assigned.insert(slot, palette);
             }
         }
