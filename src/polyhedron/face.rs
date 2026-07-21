@@ -46,13 +46,18 @@ pub struct FaceTypeOption {
 }
 
 impl FaceColoring {
-    /// Tells the coloring how many palette entries exist. Preserves the current preference order
-    /// for still-valid entries and appends any newly-available ones at the end.
+    /// Tells the coloring how many palette entries exist.
+    /// Preserves the current preference order for still-valid entries and appends any newly-available ones at the end.
     pub fn set_palette_len(&mut self, len: usize) {
         if self.palette_order.len() == len {
             return;
         }
-        let mut order: Vec<usize> = self.palette_order.iter().copied().filter(|&p| p < len).collect();
+        let mut order: Vec<usize> = self
+            .palette_order
+            .iter()
+            .copied()
+            .filter(|&p| p < len)
+            .collect();
         for p in 0..len {
             if !order.contains(&p) {
                 order.push(p);
@@ -100,6 +105,7 @@ impl FaceColoring {
                 }
             }
         }
+
         // Prefer a same-facetype ancestor first, then Jaccard similarity, then raw overlap count.
         // Same-side ranking keeps a surviving face (e.g. a triangle whose ancestry got flooded by
         // contracted neighbors) matched to its own facetype instead of a larger, better-overlapping one.
@@ -138,8 +144,9 @@ impl FaceColoring {
                     None => votes.push((matched_color[i], 1)),
                 }
             }
-            // Prefer the most common real (matched) color; only mint a new slot if no face in
-            // this group matched anything. Otherwise a facetype with more new faces than old ones
+            // Prefer the most common real (matched) color;
+            // only mint a new slot if no face in this group matched anything.
+            // Otherwise a facetype with more new faces than old ones
             // (e.g. expand's 8 triangles onto 4) could tie against `None` and lose its color.
             let winner = votes
                 .iter()
@@ -162,10 +169,10 @@ impl FaceColoring {
         self.assign_render_indices();
     }
 
-    /// Maps each face's color slot to a palette index. A slot that is still present keeps its
-    /// entry (a facetype never changes color while on screen). Each palette entry freed by a
-    /// disappearing facetype moves to the back of `palette_order`, so newly-present slots draw the
-    /// freshest colors first and only recycle a freed one once the rest are exhausted.
+    /// Maps each face's color slot to a palette index.
+    /// A slot that is still present keeps its entry (a facetype never changes color while on screen).
+    /// Each palette entry freed by a disappearing facetype moves to the back of `palette_order`,
+    /// so newly-present slots draw the freshest colors first and only recycle a freed one once the rest are exhausted.
     fn assign_render_indices(&mut self) {
         let present: BTreeSet<usize> = self.colors.iter().copied().collect();
 
@@ -177,10 +184,12 @@ impl FaceColoring {
             .map(|(_, &palette)| palette)
             .collect();
         freed.sort_unstable();
+
         for palette in freed {
             self.palette_order.retain(|&p| p != palette);
             self.palette_order.push(palette);
         }
+
         // Make sure there is always at least one entry per present facetype to hand out.
         for extra in self.palette_order.len()..present.len() {
             self.palette_order.push(extra);
@@ -188,6 +197,7 @@ impl FaceColoring {
 
         let mut new_map: HashMap<usize, usize> = HashMap::new();
         let mut used: BTreeSet<usize> = BTreeSet::new();
+
         // Survivors keep their palette entry.
         for &slot in &present {
             if let Some(&palette) = self.palette_of_slot.get(&slot) {
@@ -195,6 +205,7 @@ impl FaceColoring {
                 used.insert(palette);
             }
         }
+
         // New facetypes take the first not-in-use entry in preference order.
         for &slot in &present {
             if let std::collections::hash_map::Entry::Vacant(entry) = new_map.entry(slot) {

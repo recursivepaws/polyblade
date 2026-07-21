@@ -91,10 +91,10 @@ impl Shape {
         edges
     }
 
-    /// `e` expand (cantellation): one new vertex per original vertex-face corner.
-    /// Returns each new vertex's originating vertex (so render can re-seed positions)
-    /// and the face-figure edges (contracting them collapses each face to a point,
-    /// yielding the dual).
+    /// `e` expand / cantellation: one new vertex per original vertex-face corner.
+    /// Returns:
+    /// - each new vertex's originating vertex, so that render can re-seed positions.
+    /// - the face-figure edges which we contract to make a dual
     pub fn expand(&mut self) -> (Vec<VertexId>, Vec<[VertexId; 2]>) {
         let cycles: Vec<Vec<VertexId>> = self
             .cycles
