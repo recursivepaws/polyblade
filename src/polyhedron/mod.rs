@@ -1,5 +1,6 @@
 mod conway;
 pub mod face;
+mod palette;
 mod platonic;
 mod render;
 mod shape;
@@ -37,6 +38,39 @@ const SCHLEGEL_CONTAINMENT_MARGIN: f32 = 0.9;
 
 /// Depth epsilon for the containment check, scaled to the face's inradius to avoid flicker.
 const SCHLEGEL_DEPTH_EPSILON_FACTOR: f32 = 0.02;
+
+/// Contracts each edge in turn, remapping later edges onto the surviving lower index and closing the gap.
+/// `delete(v, u)` performs the per-structure removal of the higher endpoint `v` merged into survivor `u`.
+pub(crate) fn contract_edge_indices(
+    mut edges: Vec<[VertexId; 2]>,
+    mut delete: impl FnMut(VertexId, VertexId),
+) {
+    while !edges.is_empty() {
+        let [w, x] = edges.remove(0);
+        // Endpoints already merged (e.g. the last edge of a contracted cycle); nothing to do.
+        if w == x {
+            continue;
+        }
+        let v = w.max(x);
+        let u = w.min(x);
+        delete(v, u);
+        // Remap the deleted vertex onto the survivor, then close the index gap.
+        for [x, w] in &mut edges {
+            if *x == v {
+                *x = u;
+            }
+            if *w == v {
+                *w = u;
+            }
+            if *x > v {
+                *x -= 1;
+            }
+            if *w > v {
+                *w -= 1;
+            }
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Polyhedron {
@@ -118,7 +152,7 @@ impl Polyhedron {
                     let new_transactions = match conway {
                         Dual => {
                             // Expand blooms out, then contracting the face-figures collapses each face to a point.
-                            let edges = self.dual();
+                            let edges = self.begin_dual();
                             vec![
                                 Wait(Instant::now() + Duration::from_millis(500)),
                                 Contraction(edges),

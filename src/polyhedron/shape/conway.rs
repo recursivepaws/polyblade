@@ -11,8 +11,7 @@ impl Shape {
     }
 
     /// `t` full truncation: one new vertex per (vertex, incident-edge) corner.
-    /// Returns the vertex-figure edges (so `ambo` contracts the rest) and each
-    /// new vertex's originating vertex (so render can re-seed positions).
+    /// Returns the vertex-figure edges (so `ambo` contracts the rest) and each new vertex's origin for render re-seeding.
     pub fn truncate(&mut self) -> (Vec<[VertexId; 2]>, Vec<VertexId>) {
         // Index every (vertex, neighbor) corner; `corner[(v, u)]` is the new vertex there.
         let mut corner: HashMap<(VertexId, VertexId), VertexId> = HashMap::new();
@@ -92,9 +91,7 @@ impl Shape {
     }
 
     /// `e` expand / cantellation: one new vertex per original vertex-face corner.
-    /// Returns:
-    /// - each new vertex's originating vertex, so that render can re-seed positions.
-    /// - the face-figure edges which we contract to make a dual
+    /// Returns each new vertex's origin (for render re-seeding) and the face-figure edges to contract for the dual.
     pub fn expand(&mut self) -> (Vec<VertexId>, Vec<[VertexId; 2]>) {
         let cycles: Vec<Vec<VertexId>> = self
             .cycles

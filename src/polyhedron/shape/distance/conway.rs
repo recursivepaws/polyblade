@@ -16,35 +16,10 @@ impl Distance {
         self.delete(v);
     }
 
-    pub fn contract_edges(&mut self, mut edges: Vec<[VertexId; 2]>) {
-        while !edges.is_empty() {
-            // Pop an edge
-            let [w, x] = edges.remove(0);
-            // Endpoints already merged (e.g. the last edge of a contracted cycle); nothing to do.
-            if w == x {
-                continue;
-            }
-            let v = w.max(x);
-            let u = w.min(x);
-
-            // Contract [v, u], deleting v
+    pub fn contract_edges(&mut self, edges: Vec<[VertexId; 2]>) {
+        crate::polyhedron::contract_edge_indices(edges, |v, u| {
             self.contract_edge([v, u]);
-            // Remap the deleted vertex onto the survivor, then close the index gap.
-            for [x, w] in &mut edges {
-                if *x == v {
-                    *x = u;
-                }
-                if *w == v {
-                    *w = u;
-                }
-                if *x > v {
-                    *x -= 1;
-                }
-                if *w > v {
-                    *w -= 1;
-                }
-            }
-        }
+        });
     }
 
     pub fn split_vertex(&mut self, v: VertexId, connections: Vec<VertexId>) -> Vec<[VertexId; 2]> {

@@ -234,7 +234,7 @@ fn dodecahedron_is_well_formed() {
 fn dual_cube_gives_octahedron() {
     // Dual = expand, then contract the returned face-figure edges.
     let mut polyhedron = Polyhedron::preset(&Prism(4));
-    let edges = polyhedron.dual();
+    let edges = polyhedron.begin_dual();
     polyhedron.contract(edges);
 
     // Octahedron: V=6, E=12, F=8, all triangles.
@@ -255,7 +255,7 @@ fn dual_preserves_triangle_color_continuity() {
     let mut polyhedron = Polyhedron::preset(&Prism(4));
 
     polyhedron.cache_faces();
-    let edges = polyhedron.dual();
+    let edges = polyhedron.begin_dual();
     polyhedron.reconcile_face_colors();
     let triangle = FaceTypeSignature {
         side_count: 3,
@@ -307,7 +307,7 @@ fn survivor_keeps_color_while_freed_colors_rotate_to_the_back() {
 
     // First dual: capture the intermediate cuboctahedron's square palette entry.
     polyhedron.cache_faces();
-    let edges = polyhedron.dual();
+    let edges = polyhedron.begin_dual();
     polyhedron.reconcile_face_colors();
     let first_square = render_index_for_signature(&polyhedron, &square);
     polyhedron.cache_faces();
@@ -322,7 +322,7 @@ fn survivor_keeps_color_while_freed_colors_rotate_to_the_back() {
     // Second dual: the recreated square advances to a fresh palette entry (the freed one is
     // now at the back), and the surviving tetrahedron still holds its original color.
     polyhedron.cache_faces();
-    let edges = polyhedron.dual();
+    let edges = polyhedron.begin_dual();
     polyhedron.reconcile_face_colors();
     let second_square = render_index_for_signature(&polyhedron, &square);
     assert_ne!(
@@ -346,9 +346,9 @@ fn survivor_keeps_color_while_freed_colors_rotate_to_the_back() {
 fn dual_twice_is_identity() {
     // dd == identity: cube -> octahedron -> cube.
     let mut polyhedron = Polyhedron::preset(&Prism(4));
-    let edges = polyhedron.dual();
+    let edges = polyhedron.begin_dual();
     polyhedron.contract(edges);
-    let edges = polyhedron.dual();
+    let edges = polyhedron.begin_dual();
     polyhedron.contract(edges);
 
     assert_eq!(polyhedron.shape.order(), 8, "vertex count");
