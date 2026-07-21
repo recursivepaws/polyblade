@@ -214,6 +214,37 @@ fn truncate_preserves_facetype_colors() {
     assert_ne!(color_for_signature(&polyhedron, &triangle), square_color);
 }
 
+/// The color slot of the first face with the given side count; panics if none matches.
+fn color_by_side(polyhedron: &Polyhedron, side: usize) -> usize {
+    let i = polyhedron
+        .shape
+        .cycles
+        .iter()
+        .position(|c| c.len() == side)
+        .unwrap_or_else(|| panic!("no face with {side} sides"));
+    polyhedron.face_coloring.colors[i]
+}
+
+#[test]
+fn truncate_cuboctahedron_keeps_square_color_on_octagons() {
+    // cube -> ambo -> cuboctahedron (6 squares + 8 triangles).
+    let mut polyhedron = Polyhedron::preset(&Prism(4));
+    apply_ambo(&mut polyhedron);
+    let square = FaceTypeSignature {
+        side_count: 4,
+        neighbor_sides: vec![3, 3, 3, 3],
+    };
+    let square_color = color_for_signature(&polyhedron, &square);
+
+    // truncate -> truncated cuboctahedron; each square becomes an octagon and must keep its color.
+    apply_truncate(&mut polyhedron);
+    assert_uniform_colors_per_facetype(&polyhedron);
+
+    // The octagons descend from the squares, so they inherit the color; the new vertex-figure squares must not steal it.
+    assert_eq!(color_by_side(&polyhedron, 8), square_color, "octagons keep the square color");
+    assert_ne!(color_by_side(&polyhedron, 4), square_color, "new squares must not steal the square color");
+}
+
 #[test]
 fn dodecahedron_is_well_formed() {
     // dual(antiprism 5) then truncate its two degree-5 apexes -> dodecahedron.

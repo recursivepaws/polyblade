@@ -75,30 +75,30 @@ impl FaceColoring {
     pub fn reconcile(&mut self, ancestors: Vec<HashSet<u64>>, signatures: &[FaceTypeSignature]) {
         let old = &self.cache;
 
-        // (new_face, old_face, intersection, union, same_side) per candidate pair with any overlap.
-        let mut candidates: Vec<(usize, usize, usize, usize, bool)> = Vec::new();
+        // (new_face, old_face, coverage, jaccard, same_side) per candidate pair with any overlap.
+        // `coverage` is the fraction of the old face's ancestry inherited by the new face.
+        let mut candidates: Vec<(usize, usize, f64, f64, bool)> = Vec::new();
         for (i, a) in ancestors.iter().enumerate() {
             for (j, o) in old.ancestors.iter().enumerate() {
                 let intersection = o.intersection(a).count();
                 if intersection > 0 {
-                    let union = o.union(a).count();
+                    let coverage = intersection as f64 / o.len() as f64;
+                    let jaccard = intersection as f64 / o.union(a).count() as f64;
                     let same_side = old
                         .side_counts
                         .get(j)
                         .is_some_and(|&s| s == signatures[i].side_count);
-                    candidates.push((i, j, intersection, union, same_side));
+                    candidates.push((i, j, coverage, jaccard, same_side));
                 }
             }
         }
 
-        // Prefer a same-facetype ancestor, then Jaccard similarity, then raw overlap count.
-        // Same-side ranking keeps a survivor matched to its own facetype, not a larger better-overlapping one.
-        candidates.sort_by(|&(_, _, ia, ua, sa), &(_, _, ib, ub, sb)| {
-            let jaccard_a = ia as f64 / ua as f64;
-            let jaccard_b = ib as f64 / ub as f64;
-            sb.cmp(&sa)
-                .then_with(|| jaccard_b.total_cmp(&jaccard_a))
-                .then(ib.cmp(&ia))
+        // Rank by how fully the new face inherits the old face's ancestry, then same-side, then Jaccard.
+        // Coverage keeps a face's color when its side count changes (truncation's square -> octagon), where side-count matching would misassign it.
+        candidates.sort_by(|&(_, _, ca, ja, sa), &(_, _, cb, jb, sb)| {
+            cb.total_cmp(&ca)
+                .then_with(|| sb.cmp(&sa))
+                .then_with(|| jb.total_cmp(&ja))
         });
 
         let mut matched_color: Vec<Option<usize>> = vec![None; ancestors.len()];
