@@ -49,4 +49,9 @@ impl Polyhedron {
     pub fn chamfer(&mut self) {
         self.shape.chamfer();
     }
+
+    pub fn expand(&mut self) {
+        let parents = self.shape.expand();
+        self.render.rebuild_from_parents(&parents);
+    }
 }

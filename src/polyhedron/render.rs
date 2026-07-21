@@ -63,6 +63,13 @@ impl Render {
         self.speeds.extend(vec![Vec3::zero(); n]);
     }
 
+    /// Re-seeds positions after a re-indexing rebuild: new vertex `k` starts at its parent's position.
+    /// Speeds reset to zero so the fresh vertices relax outward from the original corners.
+    pub fn rebuild_from_parents(&mut self, parents: &[VertexId]) {
+        self.positions = parents.iter().map(|&p| self.positions[p]).collect();
+        self.speeds = vec![Vec3::zero(); parents.len()];
+    }
+
     pub fn spring_length(&self, [v, u]: [VertexId; 2]) -> f32 {
         (self.positions[v] - self.positions[u]).mag()
     }

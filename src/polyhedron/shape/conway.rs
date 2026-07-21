@@ -1,5 +1,6 @@
-use super::{Cycle, Cycles, Shape};
+use super::{Cycle, Cycles, Distance, Shape};
 use crate::polyhedron::VertexId;
+use std::collections::HashMap;
 
 impl Shape {
     pub fn split_vertex(&mut self, v: VertexId) -> Vec<[usize; 2]> {
@@ -48,6 +49,68 @@ impl Shape {
 
         self.recompute();
         edges
+    }
+
+    /// `e` expand (cantellation): one new vertex per original vertex-face corner.
+    /// Returns each new vertex's originating vertex, so render can re-seed positions.
+    pub fn expand(&mut self) -> Vec<VertexId> {
+        let cycles: Vec<Vec<VertexId>> = self
+            .cycles
+            .iter()
+            .map(|c| c.iter().copied().collect())
+            .collect();
+
+        // Index every (face, corner) incidence; `c[f][i]` is the new vertex there.
+        let mut c: Vec<Vec<VertexId>> = Vec::with_capacity(cycles.len());
+        let mut parents: Vec<VertexId> = Vec::new();
+        for cycle in &cycles {
+            let row = cycle
+                .iter()
+                .map(|&v| {
+                    parents.push(v);
+                    parents.len() - 1
+                })
+                .collect();
+            c.push(row);
+        }
+
+        // Which two faces each original edge borders.
+        let mut edge_faces: HashMap<[VertexId; 2], Vec<usize>> = HashMap::new();
+        for (f, cycle) in cycles.iter().enumerate() {
+            let n = cycle.len();
+            for k in 0..n {
+                let (a, b) = (cycle[k], cycle[(k + 1) % n]);
+                let edge = if a < b { [a, b] } else { [b, a] };
+                edge_faces.entry(edge).or_default().push(f);
+            }
+        }
+
+        let mut distance = Distance::new(parents.len());
+        // Face-figure edges: the original n-gon, using this face's corner copies.
+        for (f, cycle) in cycles.iter().enumerate() {
+            let n = cycle.len();
+            for k in 0..n {
+                distance.connect([c[f][k], c[f][(k + 1) % n]]);
+            }
+        }
+        // Vertex-figure rungs: link the two faces' copies of each endpoint.
+        // The edge quads emerge for free as chordless 4-cycles of ff-edges + rungs.
+        for (edge, faces) in &edge_faces {
+            if faces.len() != 2 {
+                continue;
+            }
+            let [f, g] = [faces[0], faces[1]];
+            for &v in edge {
+                let pf = cycles[f].iter().position(|&x| x == v).unwrap();
+                let pg = cycles[g].iter().position(|&x| x == v).unwrap();
+                distance.connect([c[f][pf], c[g][pg]]);
+            }
+        }
+
+        distance.inherit_ancestry(&self.distance, &parents);
+        self.distance = distance;
+        self.recompute();
+        parents
     }
 
     pub fn chamfer(&mut self) {

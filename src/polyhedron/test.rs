@@ -50,6 +50,12 @@ fn apply_ambo(polyhedron: &mut Polyhedron) {
     polyhedron.reconcile_face_colors();
 }
 
+fn apply_expand(polyhedron: &mut Polyhedron) {
+    polyhedron.cache_faces();
+    polyhedron.expand();
+    polyhedron.reconcile_face_colors();
+}
+
 /// Every face sharing a `FaceTypeSignature` must share a color.
 fn assert_uniform_colors_per_facetype(polyhedron: &Polyhedron) {
     let signatures = polyhedron.face_signatures();
@@ -124,6 +130,36 @@ fn ambo_twice_preserves_facetype_colors() {
     let vertex_figure_color = color_for_signature(&polyhedron, &vertex_figure_square);
     assert_ne!(vertex_figure_color, triangle_color);
     assert_ne!(vertex_figure_color, square_color);
+}
+
+#[test]
+fn expand_preserves_facetype_colors() {
+    // cube ("C"); every square borders four squares.
+    let mut polyhedron = Polyhedron::preset(&Prism(4));
+    let square = FaceTypeSignature {
+        side_count: 4,
+        neighbor_sides: vec![4, 4, 4, 4],
+    };
+    let square_color = color_for_signature(&polyhedron, &square);
+
+    // rhombicuboctahedron ("eC")
+    apply_expand(&mut polyhedron);
+    assert_uniform_colors_per_facetype(&polyhedron);
+
+    // Original faces persist as squares bordered by squares; must keep their color via ancestry.
+    assert_eq!(color_for_signature(&polyhedron, &square), square_color);
+
+    // Genuinely new facetypes must be distinct from the persisting square.
+    let vertex_figure = FaceTypeSignature {
+        side_count: 3,
+        neighbor_sides: vec![4, 4, 4],
+    };
+    let edge_quad = FaceTypeSignature {
+        side_count: 4,
+        neighbor_sides: vec![3, 3, 4, 4],
+    };
+    assert_ne!(color_for_signature(&polyhedron, &vertex_figure), square_color);
+    assert_ne!(color_for_signature(&polyhedron, &edge_quad), square_color);
 }
 
 #[test]
