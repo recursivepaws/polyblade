@@ -8,7 +8,7 @@ use test_case::test_case;
 #[test_case(Polyhedron::preset(&Pyramid(3)); "T")]
 #[test_case(Polyhedron::preset(&Prism(4)); "C")]
 #[test_case(Polyhedron::preset(&Octahedron); "O")]
-// #[test_case(Polyhedron::preset(&Dodecahedron); "D")]
+#[test_case(Polyhedron::preset(&Dodecahedron); "D")]
 #[test_case(Polyhedron::preset(&Icosahedron); "I")]
 // #[test_case({ let mut g = Polyhedron::preset(&Prism(4)); g.truncate(0); g} ; "tC")]
 // #[test_case({ let mut g = Polyhedron::preset(&Octahedron); g.truncate(0); g} ; "tO")]
