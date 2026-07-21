@@ -48,7 +48,11 @@ fn ambo_cube_gives_cuboctahedron() {
     assert_eq!(polyhedron.shape.order(), 12, "vertex count");
     assert_eq!(polyhedron.shape.edges().count(), 24, "edge count");
     assert_eq!(polyhedron.shape.cycles.len(), 14, "face count");
-    assert_eq!(polyhedron.render.positions.len(), 12, "render stays in sync");
+    assert_eq!(
+        polyhedron.render.positions.len(),
+        12,
+        "render stays in sync"
+    );
 }
 
 fn apply_ambo(polyhedron: &mut Polyhedron) {
@@ -180,7 +184,10 @@ fn expand_preserves_facetype_colors() {
         side_count: 4,
         neighbor_sides: vec![3, 3, 4, 4],
     };
-    assert_ne!(color_for_signature(&polyhedron, &vertex_figure), square_color);
+    assert_ne!(
+        color_for_signature(&polyhedron, &vertex_figure),
+        square_color
+    );
     assert_ne!(color_for_signature(&polyhedron, &edge_quad), square_color);
 }
 
@@ -241,8 +248,16 @@ fn truncate_cuboctahedron_keeps_square_color_on_octagons() {
     assert_uniform_colors_per_facetype(&polyhedron);
 
     // The octagons descend from the squares, so they inherit the color; the new vertex-figure squares must not steal it.
-    assert_eq!(color_by_side(&polyhedron, 8), square_color, "octagons keep the square color");
-    assert_ne!(color_by_side(&polyhedron, 4), square_color, "new squares must not steal the square color");
+    assert_eq!(
+        color_by_side(&polyhedron, 8),
+        square_color,
+        "octagons keep the square color"
+    );
+    assert_ne!(
+        color_by_side(&polyhedron, 4),
+        square_color,
+        "new squares must not steal the square color"
+    );
 }
 
 #[test]
@@ -258,7 +273,11 @@ fn dodecahedron_is_well_formed() {
     for v in polyhedron.shape.vertices() {
         assert_eq!(polyhedron.shape.degree(v), 3, "vertex {v} degree");
     }
-    assert_eq!(polyhedron.render.positions.len(), 20, "render stays in sync");
+    assert_eq!(
+        polyhedron.render.positions.len(),
+        20,
+        "render stays in sync"
+    );
 }
 
 #[test]

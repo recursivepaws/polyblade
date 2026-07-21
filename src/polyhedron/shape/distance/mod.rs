@@ -96,7 +96,10 @@ impl Distance {
     /// Copies each vertex's ancestor set from `source`, one per entry in `parents`.
     /// Used when a rebuild re-indexes vertices but must carry provenance for face coloring.
     pub fn inherit_ancestry(&mut self, source: &Distance, parents: &[VertexId]) {
-        self.ancestors = parents.iter().map(|&p| source.ancestors[p].clone()).collect();
+        self.ancestors = parents
+            .iter()
+            .map(|&p| source.ancestors[p].clone())
+            .collect();
         self.next_tag = source.next_tag;
     }
 

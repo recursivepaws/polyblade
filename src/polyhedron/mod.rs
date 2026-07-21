@@ -529,7 +529,10 @@ impl Polyhedron {
                 };
 
                 // Exhausted only when live facetypes outnumber the palette; the `%` then wraps to a reused color.
-                debug_assert!(render_colors[i] < colors.len(), "palette exhausted: more facetypes than colors");
+                debug_assert!(
+                    render_colors[i] < colors.len(),
+                    "palette exhausted: more facetypes than colors"
+                );
                 let color: Vec4 = colors[render_colors[i] % colors.len()].into();
                 // Map into MomentVertices
                 positions
