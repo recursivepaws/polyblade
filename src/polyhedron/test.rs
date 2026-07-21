@@ -288,11 +288,13 @@ fn dual_preserves_triangle_color_continuity() {
 }
 
 #[test]
-fn repeated_dual_is_palette_stable() {
-    // The tetrahedron is self-dual, so dualing it repeatedly must not drift the palette.
-    // Each dual passes through a cuboctahedron whose square facetype is recreated from
-    // scratch; its rendered palette entry must be identical every time.
+fn survivor_keeps_color_while_freed_colors_rotate_to_the_back() {
+    // The tetrahedron is self-dual. Its surviving face color must never change, but the
+    // transient facetypes created along the way should advance through the palette: a color
+    // freed by a disappearing facetype goes to the back, so the next new facetype picks a
+    // fresh entry rather than recycling the one just freed.
     let mut polyhedron = Polyhedron::preset(&Pyramid(3));
+    polyhedron.face_coloring.set_palette_len(6);
     let triangle = FaceTypeSignature {
         side_count: 3,
         neighbor_sides: vec![3, 3, 3],
@@ -301,36 +303,41 @@ fn repeated_dual_is_palette_stable() {
         side_count: 4,
         neighbor_sides: vec![3, 3, 3, 3],
     };
-    let start = render_index_for_signature(&polyhedron, &triangle);
+    let tetra_color = render_index_for_signature(&polyhedron, &triangle);
 
     // First dual: capture the intermediate cuboctahedron's square palette entry.
     polyhedron.cache_faces();
     let edges = polyhedron.dual();
     polyhedron.reconcile_face_colors();
-    let square_render = render_index_for_signature(&polyhedron, &square);
+    let first_square = render_index_for_signature(&polyhedron, &square);
     polyhedron.cache_faces();
     polyhedron.contract(edges);
     polyhedron.reconcile_face_colors();
     assert_eq!(
         render_index_for_signature(&polyhedron, &triangle),
-        start,
+        tetra_color,
         "tetrahedron keeps its color after one dual"
     );
 
-    // Second dual: the recreated square must land on the same palette entry.
+    // Second dual: the recreated square advances to a fresh palette entry (the freed one is
+    // now at the back), and the surviving tetrahedron still holds its original color.
     polyhedron.cache_faces();
     let edges = polyhedron.dual();
     polyhedron.reconcile_face_colors();
-    assert_eq!(
-        render_index_for_signature(&polyhedron, &square),
-        square_render,
-        "recreated square facetype reuses the same palette entry across duals"
+    let second_square = render_index_for_signature(&polyhedron, &square);
+    assert_ne!(
+        second_square, first_square,
+        "recreated square advances instead of recycling the just-freed color"
+    );
+    assert_ne!(
+        second_square, tetra_color,
+        "recreated square never collides with the surviving facetype's color"
     );
     polyhedron.contract(edges);
     polyhedron.reconcile_face_colors();
     assert_eq!(
         render_index_for_signature(&polyhedron, &triangle),
-        start,
+        tetra_color,
         "tetrahedron keeps its color after a second dual"
     );
 }

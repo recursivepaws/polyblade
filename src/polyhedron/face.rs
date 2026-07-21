@@ -18,9 +18,12 @@ pub struct FaceColoring {
     /// Palette index per face, derived from `colors`; kept in sync wherever `colors` is set.
     pub render_indices: Vec<usize>,
     /// Palette index assigned to each currently-present color slot. A surviving slot keeps its
-    /// entry; a slot that disappears frees its entry for reuse. This keeps a facetype's rendered
-    /// color stable both when the facetype survives and when it is recreated by a later operation.
+    /// entry, so a facetype's rendered color never changes while it stays on screen.
     palette_of_slot: HashMap<usize, usize>,
+    /// Palette indices in allocation-preference order (front = used first), and implicitly the
+    /// palette length. When a facetype disappears its entry moves to the back, so new facetypes
+    /// advance to fresh colors instead of recycling a just-freed one.
+    palette_order: Vec<usize>,
     /// Pre-mutation snapshot of ancestors/colors, used to reconcile colors across a structural change.
     cache: FaceCache,
 }
@@ -43,6 +46,21 @@ pub struct FaceTypeOption {
 }
 
 impl FaceColoring {
+    /// Tells the coloring how many palette entries exist. Preserves the current preference order
+    /// for still-valid entries and appends any newly-available ones at the end.
+    pub fn set_palette_len(&mut self, len: usize) {
+        if self.palette_order.len() == len {
+            return;
+        }
+        let mut order: Vec<usize> = self.palette_order.iter().copied().filter(|&p| p < len).collect();
+        for p in 0..len {
+            if !order.contains(&p) {
+                order.push(p);
+            }
+        }
+        self.palette_order = order;
+    }
+
     /// Snapshots the current colors against a fresh ancestor set, as the baseline for the next `reconcile`.
     pub fn snapshot(&mut self, ancestors: Vec<HashSet<u64>>, side_counts: Vec<usize>) {
         self.cache = FaceCache {
@@ -144,30 +162,51 @@ impl FaceColoring {
         self.assign_render_indices();
     }
 
-    /// Maps each face's color slot to a palette index, keeping present slots on their current
-    /// entry and giving each newly-present slot the lowest palette index no present slot holds.
-    /// Survivors never move (continuity), and a recreated facetype deterministically reclaims the
-    /// same free entry (stability across repeated operations), independent of the ever-growing
-    /// `next_color_slot`.
+    /// Maps each face's color slot to a palette index. A slot that is still present keeps its
+    /// entry (a facetype never changes color while on screen). Each palette entry freed by a
+    /// disappearing facetype moves to the back of `palette_order`, so newly-present slots draw the
+    /// freshest colors first and only recycle a freed one once the rest are exhausted.
     fn assign_render_indices(&mut self) {
         let present: BTreeSet<usize> = self.colors.iter().copied().collect();
 
+        // Send every palette entry freed this round to the back of the preference order.
+        let mut freed: Vec<usize> = self
+            .palette_of_slot
+            .iter()
+            .filter(|(slot, _)| !present.contains(slot))
+            .map(|(_, &palette)| palette)
+            .collect();
+        freed.sort_unstable();
+        for palette in freed {
+            self.palette_order.retain(|&p| p != palette);
+            self.palette_order.push(palette);
+        }
+        // Make sure there is always at least one entry per present facetype to hand out.
+        for extra in self.palette_order.len()..present.len() {
+            self.palette_order.push(extra);
+        }
+
         let mut new_map: HashMap<usize, usize> = HashMap::new();
         let mut used: BTreeSet<usize> = BTreeSet::new();
-        // Keep the palette entry of any slot that is still present.
+        // Survivors keep their palette entry.
         for &slot in &present {
             if let Some(&palette) = self.palette_of_slot.get(&slot) {
                 new_map.insert(slot, palette);
                 used.insert(palette);
             }
         }
-        // Assign each newly-present slot the lowest free palette entry.
+        // New facetypes take the first not-in-use entry in preference order.
         for &slot in &present {
-            new_map.entry(slot).or_insert_with(|| {
-                let palette = (0..).find(|p| !used.contains(p)).unwrap();
+            if let std::collections::hash_map::Entry::Vacant(entry) = new_map.entry(slot) {
+                let palette = self
+                    .palette_order
+                    .iter()
+                    .copied()
+                    .find(|p| !used.contains(p))
+                    .unwrap_or(0);
                 used.insert(palette);
-                palette
-            });
+                entry.insert(palette);
+            }
         }
 
         self.render_indices = self.colors.iter().map(|slot| new_map[slot]).collect();

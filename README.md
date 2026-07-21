@@ -31,12 +31,7 @@
     </p>
 </div>
 
-## WARNING
-This software is currently broken. Use the release published on crates.io or 0.1.0 while I fix it, which can be installed using the method below.
-The main branch is not as functional as it once was, but this will be remedied soon post-refactor.
-
-## Installation
-```cargo install polyblade```
+## Running
 
 Note that the `webGPU` demo is available [here](https://polyblade.app). It runs just as smoothly as the native application.
 
@@ -58,7 +53,8 @@ Rest assured that in due time we will conquer all shapes.
 - [x] Truncate
 - [ ] Ortho
 - [x] Bevel
-- [ ] Expand
+- [x] Expand
+- [x] Dual
 - [ ] Snub
 - [ ] Join
 - [ ] Zip
