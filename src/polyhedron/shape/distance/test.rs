@@ -91,6 +91,25 @@ fn contract_edge() {
 }
 
 #[test]
+fn contract_cycle_collapses_to_point() {
+    // A square attached to an outside vertex; contracting the whole 4-cycle must
+    // collapse it to one vertex still joined to the outsider, with no self-loop.
+    let mut graph = Distance::new(5);
+    graph.connect([0, 1]);
+    graph.connect([1, 2]);
+    graph.connect([2, 3]);
+    graph.connect([3, 0]);
+    graph.connect([0, 4]); // tail to an outside vertex
+
+    graph.contract_edges(vec![[0, 1], [1, 2], [2, 3], [3, 0]]);
+
+    // Four cycle vertices merged into one; the outsider survives as its neighbor.
+    assert_eq!(graph.order(), 2);
+    assert_eq!(graph.edges().count(), 1);
+    assert_eq!(graph[[0, 0]], 0, "no self-loop on the survivor");
+}
+
+#[test]
 fn bfs_apsp() {
     let mut distance = Distance::new(4);
     distance.connect([0, 1]);

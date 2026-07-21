@@ -59,7 +59,14 @@ impl Polyhedron {
     }
 
     pub fn expand(&mut self) {
-        let parents = self.shape.expand();
+        let (parents, _) = self.shape.expand();
         self.render.rebuild_from_parents(&parents);
+    }
+
+    /// Expands, then returns the face-figure edges to contract for the dual.
+    pub fn dual(&mut self) -> Vec<[VertexId; 2]> {
+        let (parents, face_edges) = self.shape.expand();
+        self.render.rebuild_from_parents(&parents);
+        face_edges
     }
 }

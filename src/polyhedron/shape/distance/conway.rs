@@ -20,13 +20,23 @@ impl Distance {
         while !edges.is_empty() {
             // Pop an edge
             let [w, x] = edges.remove(0);
+            // Endpoints already merged (e.g. the last edge of a contracted cycle); nothing to do.
+            if w == x {
+                continue;
+            }
             let v = w.max(x);
             let u = w.min(x);
 
             // Contract [v, u], deleting v
             self.contract_edge([v, u]);
-            // Decrement the value of every vertex
+            // Remap the deleted vertex onto the survivor, then close the index gap.
             for [x, w] in &mut edges {
+                if *x == v {
+                    *x = u;
+                }
+                if *w == v {
+                    *w = u;
+                }
                 if *x > v {
                     *x -= 1;
                 }

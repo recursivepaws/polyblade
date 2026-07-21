@@ -206,6 +206,40 @@ fn truncate_preserves_facetype_colors() {
 }
 
 #[test]
+fn dual_cube_gives_octahedron() {
+    // Dual = expand, then contract the returned face-figure edges.
+    let mut polyhedron = Polyhedron::preset(&Prism(4));
+    let edges = polyhedron.dual();
+    polyhedron.contract(edges);
+
+    // Octahedron: V=6, E=12, F=8, all triangles.
+    assert_eq!(polyhedron.shape.order(), 6, "vertex count");
+    assert_eq!(polyhedron.shape.edges().count(), 12, "edge count");
+    assert_eq!(polyhedron.shape.cycles.len(), 8, "face count");
+    for c in polyhedron.shape.cycles.iter() {
+        assert_eq!(c.len(), 3, "all faces are triangles");
+    }
+    assert_eq!(polyhedron.render.positions.len(), 6, "render stays in sync");
+}
+
+#[test]
+fn dual_twice_is_identity() {
+    // dd == identity: cube -> octahedron -> cube.
+    let mut polyhedron = Polyhedron::preset(&Prism(4));
+    let edges = polyhedron.dual();
+    polyhedron.contract(edges);
+    let edges = polyhedron.dual();
+    polyhedron.contract(edges);
+
+    assert_eq!(polyhedron.shape.order(), 8, "vertex count");
+    assert_eq!(polyhedron.shape.edges().count(), 12, "edge count");
+    assert_eq!(polyhedron.shape.cycles.len(), 6, "face count");
+    for c in polyhedron.shape.cycles.iter() {
+        assert_eq!(c.len(), 4, "all faces are squares");
+    }
+}
+
+#[test]
 fn ambo_octahedron_gives_distinct_facetype_colors() {
     // octahedron ("O")
     let mut polyhedron = Polyhedron::preset(&Octahedron);

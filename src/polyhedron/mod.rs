@@ -115,13 +115,13 @@ impl Polyhedron {
 
                     let new_transactions = match conway {
                         Dual => {
-                            // let edges = self.expand(false);
-                            // vec![
-                            //     Wait(Instant::now() + Duration::from_millis((65.0 * speed) as u64)),
-                            //     Contraction(edges),
-                            //     Name('d'),
-                            // ]
-                            todo!()
+                            // Expand blooms out, then contracting the face-figures collapses each face to a point.
+                            let edges = self.dual();
+                            vec![
+                                Wait(Instant::now() + Duration::from_millis(500)),
+                                Contraction(edges),
+                                Name('d'),
+                            ]
                         }
                         Join => {
                             // let edges = self.graph.kis(Option::None);

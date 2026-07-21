@@ -92,8 +92,10 @@ impl Shape {
     }
 
     /// `e` expand (cantellation): one new vertex per original vertex-face corner.
-    /// Returns each new vertex's originating vertex, so render can re-seed positions.
-    pub fn expand(&mut self) -> Vec<VertexId> {
+    /// Returns each new vertex's originating vertex (so render can re-seed positions)
+    /// and the face-figure edges (contracting them collapses each face to a point,
+    /// yielding the dual).
+    pub fn expand(&mut self) -> (Vec<VertexId>, Vec<[VertexId; 2]>) {
         let cycles: Vec<Vec<VertexId>> = self
             .cycles
             .iter()
@@ -127,10 +129,14 @@ impl Shape {
 
         let mut distance = Distance::new(parents.len());
         // Face-figure edges: the original n-gon, using this face's corner copies.
+        // Contracting these collapses each face to a point, giving the dual.
+        let mut face_edges = Vec::new();
         for (f, cycle) in cycles.iter().enumerate() {
             let n = cycle.len();
             for k in 0..n {
-                distance.connect([c[f][k], c[f][(k + 1) % n]]);
+                let edge = [c[f][k], c[f][(k + 1) % n]];
+                distance.connect(edge);
+                face_edges.push(edge);
             }
         }
         // Vertex-figure rungs: link the two faces' copies of each endpoint.
@@ -150,7 +156,7 @@ impl Shape {
         distance.inherit_ancestry(&self.distance, &parents);
         self.distance = distance;
         self.recompute();
-        parents
+        (parents, face_edges)
     }
 
     pub fn chamfer(&mut self) {

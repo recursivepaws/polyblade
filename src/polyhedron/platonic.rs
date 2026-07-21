@@ -6,7 +6,7 @@ impl Polyhedron {
         use PresetMessage::*;
         let mut polyhedron = match preset {
             Octahedron => Self::octahedron(),
-            Dodecahedron => todo!(),
+            Dodecahedron => Self::dodecahedron(),
             Icosahedron => Self::icosahedron(),
             _ => {
                 let shape = match preset {
@@ -39,6 +39,14 @@ impl Polyhedron {
         polyhedron.ambo_contract();
         polyhedron
     }
+
+    pub fn dodecahedron() -> Polyhedron {
+        let mut graph = Polyhedron::preset(&AntiPrism(5));
+        graph.dual();
+        graph.truncate(5);
+        graph
+    }
+
     pub fn icosahedron() -> Polyhedron {
         let mut graph = Polyhedron::preset(&AntiPrism(5));
         graph.shape.kis(Some(5));

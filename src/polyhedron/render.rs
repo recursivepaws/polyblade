@@ -108,15 +108,24 @@ impl Render {
         while !edges.is_empty() {
             // Pop an edge
             let [w, x] = edges.remove(0);
+            // Endpoints already merged (e.g. the last edge of a contracted cycle); keep in lockstep with the graph.
+            if w == x {
+                continue;
+            }
             let v = w.max(x);
-            let _u = w.min(x);
-            // if transformed.contains(&v) && transformed.contains(&u) {}
+            let u = w.min(x);
 
             self.positions.remove(v);
             self.speeds.remove(v);
-            // transformed.insert(v);
 
+            // Remap the deleted vertex onto the survivor, then close the index gap.
             for [x, w] in &mut edges {
+                if *x == v {
+                    *x = u;
+                }
+                if *w == v {
+                    *w = u;
+                }
                 if *x > v {
                     *x -= 1;
                 }
