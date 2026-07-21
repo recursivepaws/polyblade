@@ -78,7 +78,9 @@ impl Polyhedron {
     }
 
     pub fn cache_faces(&mut self) {
-        self.face_coloring.snapshot(self.shape.ancestors());
+        let side_counts = self.shape.cycles.iter().map(|c| c.len()).collect();
+        self.face_coloring
+            .snapshot(self.shape.ancestors(), side_counts);
     }
 
     pub fn process_transactions(&mut self, _speed: f32) {

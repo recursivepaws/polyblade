@@ -87,14 +87,23 @@ fn assert_uniform_colors_per_facetype(polyhedron: &Polyhedron) {
     }
 }
 
-/// The current color for a specific facetype; panics if no face currently has that signature.
-fn color_for_signature(polyhedron: &Polyhedron, target: &FaceTypeSignature) -> usize {
-    let signatures = polyhedron.face_signatures();
-    let i = signatures
+/// Index of the first face with the given signature; panics if none matches.
+fn signature_index(polyhedron: &Polyhedron, target: &FaceTypeSignature) -> usize {
+    polyhedron
+        .face_signatures()
         .iter()
         .position(|sig| sig == target)
-        .unwrap_or_else(|| panic!("no face with signature {target:?}"));
-    polyhedron.face_coloring.colors[i]
+        .unwrap_or_else(|| panic!("no face with signature {target:?}"))
+}
+
+/// The current color slot for a specific facetype.
+fn color_for_signature(polyhedron: &Polyhedron, target: &FaceTypeSignature) -> usize {
+    polyhedron.face_coloring.colors[signature_index(polyhedron, target)]
+}
+
+/// The rendered palette index (what the UI actually shows) for a specific facetype.
+fn render_index_for_signature(polyhedron: &Polyhedron, target: &FaceTypeSignature) -> usize {
+    polyhedron.face_coloring.render_indices[signature_index(polyhedron, target)]
 }
 
 #[test]
@@ -236,6 +245,94 @@ fn dual_cube_gives_octahedron() {
         assert_eq!(c.len(), 3, "all faces are triangles");
     }
     assert_eq!(polyhedron.render.positions.len(), 6, "render stays in sync");
+}
+
+#[test]
+fn dual_preserves_triangle_color_continuity() {
+    // Mirrors the Dual transaction: expand (cube -> rhombicuboctahedron), then
+    // contract the face-figures (-> octahedron). The surviving vertex-figure
+    // triangles must keep their color across the contraction.
+    let mut polyhedron = Polyhedron::preset(&Prism(4));
+
+    polyhedron.cache_faces();
+    let edges = polyhedron.dual();
+    polyhedron.reconcile_face_colors();
+    let triangle = FaceTypeSignature {
+        side_count: 3,
+        neighbor_sides: vec![4, 4, 4],
+    };
+    let pink_slot = color_for_signature(&polyhedron, &triangle);
+    let pink_render = render_index_for_signature(&polyhedron, &triangle);
+
+    polyhedron.cache_faces();
+    polyhedron.contract(edges);
+    polyhedron.reconcile_face_colors();
+    assert_uniform_colors_per_facetype(&polyhedron);
+
+    let octahedron_triangle = FaceTypeSignature {
+        side_count: 3,
+        neighbor_sides: vec![3, 3, 3],
+    };
+    // Both the color slot and — crucially — the rendered palette index must carry over,
+    // since the UI shows `palette[render_index]`, not the slot.
+    assert_eq!(
+        color_for_signature(&polyhedron, &octahedron_triangle),
+        pink_slot,
+        "octahedron triangles keep the rhombicuboctahedron triangle color slot"
+    );
+    assert_eq!(
+        render_index_for_signature(&polyhedron, &octahedron_triangle),
+        pink_render,
+        "octahedron triangles render the same palette color as before"
+    );
+}
+
+#[test]
+fn repeated_dual_is_palette_stable() {
+    // The tetrahedron is self-dual, so dualing it repeatedly must not drift the palette.
+    // Each dual passes through a cuboctahedron whose square facetype is recreated from
+    // scratch; its rendered palette entry must be identical every time.
+    let mut polyhedron = Polyhedron::preset(&Pyramid(3));
+    let triangle = FaceTypeSignature {
+        side_count: 3,
+        neighbor_sides: vec![3, 3, 3],
+    };
+    let square = FaceTypeSignature {
+        side_count: 4,
+        neighbor_sides: vec![3, 3, 3, 3],
+    };
+    let start = render_index_for_signature(&polyhedron, &triangle);
+
+    // First dual: capture the intermediate cuboctahedron's square palette entry.
+    polyhedron.cache_faces();
+    let edges = polyhedron.dual();
+    polyhedron.reconcile_face_colors();
+    let square_render = render_index_for_signature(&polyhedron, &square);
+    polyhedron.cache_faces();
+    polyhedron.contract(edges);
+    polyhedron.reconcile_face_colors();
+    assert_eq!(
+        render_index_for_signature(&polyhedron, &triangle),
+        start,
+        "tetrahedron keeps its color after one dual"
+    );
+
+    // Second dual: the recreated square must land on the same palette entry.
+    polyhedron.cache_faces();
+    let edges = polyhedron.dual();
+    polyhedron.reconcile_face_colors();
+    assert_eq!(
+        render_index_for_signature(&polyhedron, &square),
+        square_render,
+        "recreated square facetype reuses the same palette entry across duals"
+    );
+    polyhedron.contract(edges);
+    polyhedron.reconcile_face_colors();
+    assert_eq!(
+        render_index_for_signature(&polyhedron, &triangle),
+        start,
+        "tetrahedron keeps its color after a second dual"
+    );
 }
 
 #[test]
