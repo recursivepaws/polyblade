@@ -36,6 +36,34 @@ fn expand_cube() {
 }
 
 #[test]
+fn truncate_cube() {
+    let mut cube = Shape::prism(4);
+    assert_eq!(cube.order(), 8);
+    assert_eq!(cube.edges().count(), 12);
+    assert_eq!(cube.cycles.len(), 6);
+
+    cube.truncate();
+
+    // Truncated cube: V=24, E=36, F=14 (8 triangles + 6 octagons).
+    assert_eq!(cube.order(), 24, "vertex count");
+    assert_eq!(cube.edges().count(), 36, "edge count");
+    assert_eq!(cube.cycles.len(), 14, "face count");
+    // Euler characteristic.
+    assert_eq!(
+        cube.order() as i64 - cube.edges().count() as i64 + cube.cycles.len() as i64,
+        2
+    );
+    // Every vertex has degree 3 in a truncation.
+    for v in cube.vertices() {
+        assert_eq!(cube.degree(v), 3, "vertex {v} degree");
+    }
+    let tris = cube.cycles.iter().filter(|c| c.len() == 3).count();
+    let octs = cube.cycles.iter().filter(|c| c.len() == 8).count();
+    assert_eq!(tris, 8, "triangle faces");
+    assert_eq!(octs, 6, "octagon faces");
+}
+
+#[test]
 #[ignore]
 fn split_vertex_contract() {
     let mut control = Distance::new(6);

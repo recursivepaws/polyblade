@@ -9,9 +9,17 @@ impl Polyhedron {
     }
 
     pub fn truncate(&mut self, d: usize) -> Vec<[VertexId; 2]> {
+        // Full truncation is built in one pass and recomputes once.
+        if d == 0 {
+            let (new_edges, parents) = self.shape.truncate();
+            self.render.rebuild_from_parents(&parents);
+            return new_edges;
+        }
+
+        // Selective truncation still uses the slow per-vertex path; perf is a follow-up.
         let mut new_edges = Vec::default();
         for v in self.shape.vertices().rev() {
-            if d == 0 || self.shape.degree(v) == d {
+            if self.shape.degree(v) == d {
                 new_edges.extend(self.split_vertex(v));
                 self.shape.recompute();
             }

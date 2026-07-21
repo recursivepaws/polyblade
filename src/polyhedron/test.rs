@@ -1,6 +1,5 @@
 use super::*;
-use crate::render::message::PresetMessage::{self, *};
-use std::fs::create_dir_all;
+use crate::render::message::PresetMessage::*;
 //
 
 impl Polyhedron {}
@@ -33,15 +32,23 @@ fn truncate_contract() {
 }
 
 #[test]
-#[ignore]
 fn ambo() {
-    use PresetMessage::*;
-    let prefix = "tests/ambo/";
-    create_dir_all(prefix).unwrap();
+    // Ambo tetrahedron == octahedron; exercises the one-shot truncate + contraction.
     let mut polyhedron = Polyhedron::preset(&Pyramid(3));
     polyhedron.ambo_contract();
     let octahedron = Polyhedron::preset(&Octahedron);
     assert_eq!(polyhedron.shape, octahedron.shape);
+}
+
+#[test]
+fn ambo_cube_gives_cuboctahedron() {
+    // Ambo cube: V=12, E=24, F=14 (8 triangles + 6 squares).
+    let mut polyhedron = Polyhedron::preset(&Prism(4));
+    polyhedron.ambo_contract();
+    assert_eq!(polyhedron.shape.order(), 12, "vertex count");
+    assert_eq!(polyhedron.shape.edges().count(), 24, "edge count");
+    assert_eq!(polyhedron.shape.cycles.len(), 14, "face count");
+    assert_eq!(polyhedron.render.positions.len(), 12, "render stays in sync");
 }
 
 fn apply_ambo(polyhedron: &mut Polyhedron) {
@@ -53,6 +60,12 @@ fn apply_ambo(polyhedron: &mut Polyhedron) {
 fn apply_expand(polyhedron: &mut Polyhedron) {
     polyhedron.cache_faces();
     polyhedron.expand();
+    polyhedron.reconcile_face_colors();
+}
+
+fn apply_truncate(polyhedron: &mut Polyhedron) {
+    polyhedron.cache_faces();
+    polyhedron.truncate(0);
     polyhedron.reconcile_face_colors();
 }
 
@@ -160,6 +173,36 @@ fn expand_preserves_facetype_colors() {
     };
     assert_ne!(color_for_signature(&polyhedron, &vertex_figure), square_color);
     assert_ne!(color_for_signature(&polyhedron, &edge_quad), square_color);
+}
+
+#[test]
+fn truncate_preserves_facetype_colors() {
+    // cube ("C"); every square borders four squares.
+    let mut polyhedron = Polyhedron::preset(&Prism(4));
+    let square = FaceTypeSignature {
+        side_count: 4,
+        neighbor_sides: vec![4, 4, 4, 4],
+    };
+    let square_color = color_for_signature(&polyhedron, &square);
+
+    // truncated cube ("tC")
+    apply_truncate(&mut polyhedron);
+    assert_uniform_colors_per_facetype(&polyhedron);
+
+    // Each original square becomes an octagon bordered by 4 triangles + 4 octagons;
+    // it must keep the square's color via ancestry.
+    let octagon = FaceTypeSignature {
+        side_count: 8,
+        neighbor_sides: vec![3, 3, 3, 3, 8, 8, 8, 8],
+    };
+    assert_eq!(color_for_signature(&polyhedron, &octagon), square_color);
+
+    // Vertex-figure triangles are a genuinely new facetype; must differ.
+    let triangle = FaceTypeSignature {
+        side_count: 3,
+        neighbor_sides: vec![8, 8, 8],
+    };
+    assert_ne!(color_for_signature(&polyhedron, &triangle), square_color);
 }
 
 #[test]

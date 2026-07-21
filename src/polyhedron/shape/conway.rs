@@ -10,6 +10,46 @@ impl Shape {
         edges
     }
 
+    /// `t` full truncation: one new vertex per (vertex, incident-edge) corner.
+    /// Returns the vertex-figure edges (so `ambo` contracts the rest) and each
+    /// new vertex's originating vertex (so render can re-seed positions).
+    pub fn truncate(&mut self) -> (Vec<[VertexId; 2]>, Vec<VertexId>) {
+        // Index every (vertex, neighbor) corner; `corner[(v, u)]` is the new vertex there.
+        let mut corner: HashMap<(VertexId, VertexId), VertexId> = HashMap::new();
+        let mut parents: Vec<VertexId> = Vec::new();
+        let mut vertex_order: Vec<Vec<VertexId>> = Vec::with_capacity(self.order());
+        for v in self.vertices() {
+            let sc = self.cycles.sorted_connections(v);
+            for &u in &sc {
+                corner.insert((v, u), parents.len());
+                parents.push(v);
+            }
+            vertex_order.push(sc);
+        }
+
+        let mut distance = Distance::new(parents.len());
+        // Vertex-figure d-gon: link a vertex's corners in cyclic neighbor order.
+        // The truncated faces (2n-gons) emerge for free from these plus the original edges.
+        let mut new_edges = Vec::new();
+        for (v, sc) in vertex_order.iter().enumerate() {
+            let d = sc.len();
+            for i in 0..d {
+                let edge = [corner[&(v, sc[i])], corner[&(v, sc[(i + 1) % d])]];
+                distance.connect(edge);
+                new_edges.push(edge);
+            }
+        }
+        // Original edges: each keeps its two endpoint corners joined.
+        for [v, u] in self.edges() {
+            distance.connect([corner[&(v, u)], corner[&(u, v)]]);
+        }
+
+        distance.inherit_ancestry(&self.distance, &parents);
+        self.distance = distance;
+        self.recompute();
+        (new_edges, parents)
+    }
+
     pub fn contract_edges(&mut self, edges: Vec<[VertexId; 2]>) {
         self.distance.contract_edges(edges);
         // Delete a
