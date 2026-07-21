@@ -206,6 +206,22 @@ fn truncate_preserves_facetype_colors() {
 }
 
 #[test]
+fn dodecahedron_is_well_formed() {
+    // dual(antiprism 5) then truncate its two degree-5 apexes -> dodecahedron.
+    let polyhedron = Polyhedron::preset(&Dodecahedron);
+    assert_eq!(polyhedron.shape.order(), 20, "vertex count");
+    assert_eq!(polyhedron.shape.edges().count(), 30, "edge count");
+    assert_eq!(polyhedron.shape.cycles.len(), 12, "face count");
+    for c in polyhedron.shape.cycles.iter() {
+        assert_eq!(c.len(), 5, "all faces are pentagons");
+    }
+    for v in polyhedron.shape.vertices() {
+        assert_eq!(polyhedron.shape.degree(v), 3, "vertex {v} degree");
+    }
+    assert_eq!(polyhedron.render.positions.len(), 20, "render stays in sync");
+}
+
+#[test]
 fn dual_cube_gives_octahedron() {
     // Dual = expand, then contract the returned face-figure edges.
     let mut polyhedron = Polyhedron::preset(&Prism(4));

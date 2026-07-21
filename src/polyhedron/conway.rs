@@ -64,9 +64,16 @@ impl Polyhedron {
     }
 
     /// Expands, then returns the face-figure edges to contract for the dual.
+    /// The animated `Dual` transaction drives the contraction; use `dual_contract`
+    /// when you want the dual applied immediately.
     pub fn dual(&mut self) -> Vec<[VertexId; 2]> {
         let (parents, face_edges) = self.shape.expand();
         self.render.rebuild_from_parents(&parents);
         face_edges
+    }
+
+    pub fn dual_contract(&mut self) {
+        let edges = self.dual();
+        self.contract(edges);
     }
 }

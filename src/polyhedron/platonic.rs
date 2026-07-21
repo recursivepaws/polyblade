@@ -42,7 +42,7 @@ impl Polyhedron {
 
     pub fn dodecahedron() -> Polyhedron {
         let mut graph = Polyhedron::preset(&AntiPrism(5));
-        graph.dual();
+        graph.dual_contract();
         graph.truncate(5);
         graph
     }
