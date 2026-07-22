@@ -9,6 +9,7 @@ on:
 permissions:
   contents: read
   deployments: write
+  pull-requests: write
 
 # superseded preview builds get cancelled, main deploys never are
 concurrency:
@@ -74,3 +75,29 @@ jobs:
             --arg log "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
             '{state: "success", environment_url: $url, log_url: $log, auto_inactive: true}' \
             | gh api "repos/${{ github.repository }}/deployments/$deployment_id/statuses" --input -
+      - name: comment preview url on pr
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          URL: ${{ steps.vercel.outputs.url }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        # one sticky comment per PR, updated in place on each push
+        run: |
+          marker="<!-- deploy-web-preview -->"
+          body="$(cat <<EOF
+          $marker
+          ### Preview deployment
+
+          | Commit | Preview | Deployed |
+          | --- | --- | --- |
+          | \`${HEAD_SHA:0:7}\` | [Visit preview]($URL) | $(date -u +'%b %-d, %Y %H:%M UTC') |
+          EOF
+          )"
+          comment_id=$(gh api "repos/${{ github.repository }}/issues/$PR_NUMBER/comments" \
+            --paginate --jq "[.[] | select(.body | startswith(\"$marker\"))][0].id // empty")
+          if [ -n "$comment_id" ]; then
+            gh api -X PATCH "repos/${{ github.repository }}/issues/comments/$comment_id" -f body="$body"
+          else
+            gh api "repos/${{ github.repository }}/issues/$PR_NUMBER/comments" -f body="$body"
+          fi
