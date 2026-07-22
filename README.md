@@ -49,7 +49,7 @@ Due to the recent refactor, we're not as far along on this roadmap as we once we
 Rest assured that in due time we will conquer all shapes.
 
 - [x] Ambo
-- [ ] Kis
+- [x] Kis
 - [x] Truncate
 - [ ] Ortho
 - [x] Bevel
