@@ -3,11 +3,23 @@ name: deploy-web
 on:
   push:
     branches: [main]
+  pull_request: {}
   workflow_dispatch: {}
+
+permissions:
+  contents: read
+  deployments: write
+
+# superseded preview builds get cancelled, main deploys never are
+concurrency:
+  group: deploy-web-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    # fork PRs have no access to the vercel secrets
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     steps:
       - uses: actions/checkout@v5
       - uses: DeterminateSystems/determinate-nix-action@v3
@@ -31,13 +43,34 @@ jobs:
       - name: install vercel CLI
         run: npm install -g vercel@latest
       - name: deploy to vercel
+        id: vercel
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        # the CLI logs to stderr and prints only the deployment URL to stdout
         run: |
           if [ "${{ github.event_name }}" = "push" ]; then
-            vercel deploy dist/public --prod --token="$VERCEL_TOKEN" --yes
+            url=$(vercel deploy dist/public --prod --token="$VERCEL_TOKEN" --yes)
+            echo "environment=Production" >> "$GITHUB_OUTPUT"
           else
-            vercel deploy dist/public --token="$VERCEL_TOKEN" --yes
+            url=$(vercel deploy dist/public --token="$VERCEL_TOKEN" --yes)
+            echo "environment=Preview" >> "$GITHUB_OUTPUT"
           fi
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+      - name: record deployment on github
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          deployment_id=$(jq -n \
+            --arg ref "${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}" \
+            --arg env "${{ steps.vercel.outputs.environment }}" \
+            '{ref: $ref, environment: $env, auto_merge: false, required_contexts: [],
+              production_environment: ($env == "Production"),
+              transient_environment: ($env == "Preview")}' \
+            | gh api "repos/${{ github.repository }}/deployments" --input - --jq .id)
+          jq -n \
+            --arg url "${{ steps.vercel.outputs.url }}" \
+            --arg log "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            '{state: "success", environment_url: $url, log_url: $log, auto_inactive: true}' \
+            | gh api "repos/${{ github.repository }}/deployments/$deployment_id/statuses" --input -
