@@ -27,9 +27,8 @@ impl Polyhedron {
                 }
             }
         };
-        // Bootstrapping is "reconciling from nothing", so reset ancestry here too.
-        // Otherwise e.g. octahedron's internal construction-time ambo leaks into the user's first op.
-        polyhedron.shape.reset_ancestry();
+        // Bootstrapping assigns fresh colors regardless of construction-time operations.
+
         polyhedron.bootstrap_face_colors();
         polyhedron
     }

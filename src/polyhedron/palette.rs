@@ -42,7 +42,8 @@ impl PaletteAllocator {
         }
         for &slot in present {
             if !self.assigned.contains_key(&slot) {
-                // Grow on demand when the palette floor is exhausted; the render site bounds this to the real palette.
+                // An exhausted palette hands out an out-of-range index that the render site wraps.
+                // That knowingly reuses a color; the render site's debug_assert flags it in debug builds.
                 let palette = match self.free.pop_front() {
                     Some(p) => p,
                     None => self.assigned.len(),

@@ -21,7 +21,7 @@ impl Polyhedron {
         for v in self.shape.vertices().rev() {
             if self.shape.degree(v) == d {
                 new_edges.extend(self.split_vertex(v));
-                self.shape.recompute();
+                self.shape.recompute_metrics();
             }
         }
         new_edges

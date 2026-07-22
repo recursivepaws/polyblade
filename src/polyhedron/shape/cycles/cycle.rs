@@ -28,39 +28,32 @@ impl Cycle {
         self.0.len()
     }
 
-    #[allow(dead_code)]
-    pub fn delete(&mut self, v: VertexId) {
-        self.0 = self
-            .0
-            .clone()
-            .into_iter()
-            .filter_map(|u| {
-                use std::cmp::Ordering::*;
-                match v.cmp(&u) {
-                    Equal => None,
-                    Less => Some(u - 1),
-                    Greater => Some(u),
-                }
-            })
-            .collect::<Vec<_>>();
-    }
-
-    #[allow(dead_code)]
-    pub fn replace(&mut self, old: VertexId, new: VertexId) {
-        self.0 = self
-            .0
-            .clone()
-            .into_iter()
-            .filter_map(|v| {
-                if v == new {
-                    None
-                } else if v == old {
-                    Some(new)
-                } else {
-                    Some(v)
-                }
-            })
-            .collect();
+    /// Merges deleted `v` into survivor `u < v`, shifting higher indices down and collapsing consecutive duplicates.
+    /// Returns whether the face survives with at least 3 vertices.
+    pub fn contract_vertex(&mut self, v: VertexId, u: VertexId) -> bool {
+        debug_assert!(u < v, "survivor must be the lower index");
+        let mut out: Vec<VertexId> = Vec::with_capacity(self.0.len());
+        for &x in &self.0 {
+            let x = match x {
+                x if x == v => u,
+                x if x > v => x - 1,
+                x => x,
+            };
+            if out.last() != Some(&x) {
+                out.push(x);
+            }
+        }
+        while out.len() > 1 && out.first() == out.last() {
+            out.pop();
+        }
+        // A non-consecutive duplicate means the contract set pinched a face, which no operation should produce.
+        debug_assert!(
+            out.len() < 3
+                || out.iter().collect::<std::collections::HashSet<_>>().len() == out.len(),
+            "contraction pinched a face: {out:?}"
+        );
+        self.0 = out;
+        self.0.len() >= 3
     }
 
     pub fn iter(&self) -> std::slice::Iter<'_, usize> {
@@ -75,33 +68,5 @@ impl Cycle {
     #[allow(dead_code)]
     pub fn push(&mut self, v: VertexId) {
         self.0.push(v);
-    }
-}
-
-impl From<Vec<[VertexId; 2]>> for Cycle {
-    fn from(mut edges: Vec<[VertexId; 2]>) -> Self {
-        let mut first = false;
-        let mut face = vec![edges[0][0]];
-        while !edges.is_empty() {
-            let v = if first {
-                *face.first().unwrap()
-            } else {
-                *face.last().unwrap()
-            };
-            if let Some(i) = edges.iter().position(|e| e.contains(&v)) {
-                let next = if edges[i][0] == v {
-                    edges[i][1]
-                } else {
-                    edges[i][0]
-                };
-                if !face.contains(&next) {
-                    face.push(next);
-                }
-                edges.remove(i);
-            } else {
-                first ^= true;
-            }
-        }
-        Self(face)
     }
 }

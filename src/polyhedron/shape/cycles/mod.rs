@@ -1,5 +1,6 @@
 mod cycle;
-use crate::{polyhedron::VertexId, render::pipeline::ShapeVertex};
+use crate::polyhedron::{FaceId, VertexId};
+use crate::render::pipeline::ShapeVertex;
 pub use cycle::*;
 use std::{
     collections::{HashMap, HashSet},
@@ -13,13 +14,64 @@ use super::Distance;
 pub(in super::super) struct Cycles {
     // Circular lists of Vertex Ids representing faces
     cycles: Vec<Cycle>,
+    /// Stable identity per face, parallel to `cycles`; survives sorts and operations.
+    ids: Vec<FaceId>,
 }
 
 impl Cycles {
-    pub fn new(cycles: Vec<Vec<VertexId>>) -> Self {
+    pub fn new(cycles: Vec<Vec<VertexId>>, ids: Vec<FaceId>) -> Self {
+        debug_assert_eq!(cycles.len(), ids.len());
         Self {
             cycles: cycles.into_iter().map(Cycle).collect(),
+            ids,
         }
+    }
+
+    /// Stable face ids, parallel to the cycle list.
+    pub fn ids(&self) -> &[FaceId] {
+        &self.ids
+    }
+
+    /// Canonical face order: more sides first, then a more uniform neighborhood, then sorted vertices.
+    /// Total on these polyhedra (distinct faces have distinct vertex sets), so face 0 is deterministic.
+    pub fn sort(&mut self) {
+        let raw: Vec<Vec<VertexId>> = self.cycles.iter().map(|c| c.0.clone()).collect();
+        let neighbor_uniformity: Vec<usize> = neighbor_type_signatures(&raw)
+            .iter()
+            .map(|sig| sig.iter().collect::<HashSet<_>>().len())
+            .collect();
+        let mut scored: Vec<(Cycle, FaceId, usize)> = std::mem::take(&mut self.cycles)
+            .into_iter()
+            .zip(std::mem::take(&mut self.ids))
+            .zip(neighbor_uniformity)
+            .map(|((c, id), u)| (c, id, u))
+            .collect();
+        scored.sort_by_key(|(c, _, uniformity)| {
+            let mut sorted_vertices = c.0.clone();
+            sorted_vertices.sort();
+            (usize::MAX - c.len(), *uniformity, sorted_vertices)
+        });
+        for (c, id, _) in scored {
+            self.cycles.push(c);
+            self.ids.push(id);
+        }
+    }
+
+    /// Rediscovers faces from the distance matrix, minting fresh ids.
+    /// Only seed construction and the `release` fallback use this, operations build their cycles explicitly.
+    pub(super) fn discover(distance: &Distance, next_face_id: &mut FaceId) -> Self {
+        let raw = chordless_cycles(distance);
+        let ids = raw
+            .iter()
+            .map(|_| {
+                let id = *next_face_id;
+                *next_face_id += 1;
+                id
+            })
+            .collect();
+        let mut cycles = Cycles::new(raw, ids);
+        cycles.sort();
+        cycles
     }
 
     #[allow(dead_code)]
@@ -125,19 +177,20 @@ impl IndexMut<usize> for Cycles {
 }
 
 impl Cycles {
-    #[allow(dead_code)]
-    pub fn delete(&mut self, v: VertexId) {
-        for cycle in &mut self.cycles {
-            cycle.delete(v);
-        }
-    }
-
-    /// Replace all occurrence of one vertex with another
-    #[allow(dead_code)]
-    pub fn replace(&mut self, old: VertexId, new: VertexId) {
-        for cycle in &mut self.cycles {
-            cycle.replace(old, new);
-        }
+    /// Replays the same merge sequence as `Distance::contract_edges` on the face list.
+    /// Survivors keep their ids and faces that degenerate below 3 vertices are dropped.
+    pub fn contract_edges(&mut self, edges: Vec<[VertexId; 2]>) {
+        crate::polyhedron::contract_edge_indices(edges, |v, u| {
+            let alive: Vec<bool> = self
+                .cycles
+                .iter_mut()
+                .map(|cycle| cycle.contract_vertex(v, u))
+                .collect();
+            let mut it = alive.iter();
+            self.cycles.retain(|_| *it.next().unwrap());
+            let mut it = alive.iter();
+            self.ids.retain(|_| *it.next().unwrap());
+        });
     }
 }
 
@@ -173,65 +226,47 @@ fn neighbor_type_signatures(cycles: &[Vec<VertexId>]) -> Vec<Vec<usize>> {
         .collect()
 }
 
-impl From<&Distance> for Cycles {
-    fn from(distance: &Distance) -> Self {
-        let mut triplets: Vec<Vec<_>> = Default::default();
-        let mut cycles: HashSet<Vec<_>> = Default::default();
-        // find all the triplets
-        for u in 0..distance.order() {
-            for x in (u + 1)..distance.order() {
-                for y in (x + 1)..distance.order() {
-                    if distance[[u, x]] == 1 && distance[[u, y]] == 1 {
-                        if distance[[x, y]] == 1 {
-                            cycles.insert(vec![x, u, y]);
-                        } else {
-                            triplets.push(vec![x, u, y]);
-                        }
+/// Chordless-cycle face search over the distance matrix; expensive, unordered output.
+fn chordless_cycles(distance: &Distance) -> Vec<Vec<VertexId>> {
+    let mut triplets: Vec<Vec<_>> = Default::default();
+    let mut cycles: HashSet<Vec<_>> = Default::default();
+    // find all the triplets
+    for u in 0..distance.order() {
+        for x in (u + 1)..distance.order() {
+            for y in (x + 1)..distance.order() {
+                if distance[[u, x]] == 1 && distance[[u, y]] == 1 {
+                    if distance[[x, y]] == 1 {
+                        cycles.insert(vec![x, u, y]);
+                    } else {
+                        triplets.push(vec![x, u, y]);
                     }
                 }
             }
         }
-
-        // while there are unparsed triplets
-        while !triplets.is_empty() && (cycles.len() as i64) < distance.face_count() {
-            let p = triplets.remove(0);
-
-            // for each v adjacent to u_t
-            for v in distance.neighbors(p[p.len() - 1]) {
-                if v > p[1] {
-                    let adj_v = distance.neighbors(v);
-                    // if v is not a neighbor of u_2..u_t-1
-                    if !p[1..p.len() - 1].iter().any(|i| adj_v.contains(i)) {
-                        let new = [p.clone(), vec![v]].concat();
-                        if distance.neighbors(p[0]).contains(&v) {
-                            if distance.cycle_is_face(new.clone()) {
-                                cycles.insert(new);
-                            }
-                        } else {
-                            triplets.push(new);
-                        }
-                    }
-                }
-            }
-        }
-
-        let cycles = cycles.into_iter().collect::<Vec<_>>();
-
-        // Fewer distinct neighbor side-counts means a more locally symmetric/uniform face.
-        let neighbor_uniformity: Vec<usize> = neighbor_type_signatures(&cycles)
-            .iter()
-            .map(|sig| sig.iter().collect::<HashSet<_>>().len())
-            .collect();
-
-        let mut scored: Vec<(Vec<VertexId>, usize)> =
-            cycles.into_iter().zip(neighbor_uniformity).collect();
-        // Prefer more sides, then a more uniform neighborhood, then a deterministic tie-break.
-        scored.sort_by_key(|(c, uniformity)| {
-            let mut sorted_vertices = c.clone();
-            sorted_vertices.sort();
-            (usize::MAX - c.len(), *uniformity, sorted_vertices)
-        });
-        let cycles: Vec<Vec<VertexId>> = scored.into_iter().map(|(c, _)| c).collect();
-        Cycles::new(cycles)
     }
+
+    // while there are unparsed triplets
+    while !triplets.is_empty() && (cycles.len() as i64) < distance.face_count() {
+        let p = triplets.remove(0);
+
+        // for each v adjacent to u_t
+        for v in distance.neighbors(p[p.len() - 1]) {
+            if v > p[1] {
+                let adj_v = distance.neighbors(v);
+                // if v is not a neighbor of u_2..u_t-1
+                if !p[1..p.len() - 1].iter().any(|i| adj_v.contains(i)) {
+                    let new = [p.clone(), vec![v]].concat();
+                    if distance.neighbors(p[0]).contains(&v) {
+                        if distance.cycle_is_face(new.clone()) {
+                            cycles.insert(new);
+                        }
+                    } else {
+                        triplets.push(new);
+                    }
+                }
+            }
+        }
+    }
+
+    cycles.into_iter().collect()
 }

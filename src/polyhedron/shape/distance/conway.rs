@@ -9,10 +9,7 @@ impl Distance {
             self.connect([w, u]);
             self.disconnect([w, v]);
         }
-        // u now represents both original vertices
-        let absorbed = self.ancestors(v).clone();
-        self.ancestors[u].extend(absorbed);
-        // Delete v
+        // Delete v; u now represents both original vertices
         self.delete(v);
     }
 
@@ -27,7 +24,7 @@ impl Distance {
         let new_cycle: Cycle = Cycle::from(
             vec![v]
                 .into_iter()
-                .chain((1..connections.len()).map(|_| self.insert_from(&[v])))
+                .chain((1..connections.len()).map(|_| self.insert()))
                 .collect(),
         );
 

@@ -20,10 +20,6 @@ pub(super) struct Distance {
     /// The order is the number of vertices
     order: usize,
     distance: Vec<usize>,
-    /// Tags each vertex descends from; unioned into the survivor on a merge, copied to every copy on a split.
-    ancestors: Vec<HashSet<u64>>,
-    /// Next never-yet-used tag, for genuinely new vertices only.
-    next_tag: u64,
 }
 
 impl PartialEq for Distance {
@@ -44,8 +40,6 @@ impl Distance {
             distance: (0..n)
                 .flat_map(|m| [vec![usize::MAX; m], vec![0]].concat())
                 .collect(),
-            ancestors: (0..n as u64).map(|tag| HashSet::from([tag])).collect(),
-            next_tag: n as u64,
         }
     }
 }
@@ -65,51 +59,12 @@ impl Distance {
         }
     }
 
-    /// Inserts a new, genuinely-unrelated vertex in the matrix, with a fresh ancestor tag.
-    /// TODO: determine if we still even want this now that we're doing insert_from
-    #[allow(dead_code)]
+    /// Inserts a new vertex in the matrix.
     pub fn insert(&mut self) -> VertexId {
-        let v = self.insert_from(&[]);
-        self.ancestors[v].insert(self.next_tag);
-        self.next_tag += 1;
-        v
-    }
-
-    /// Inserts a new vertex that's a copy of `parents`, inheriting the union of their ancestor sets.
-    pub fn insert_from(&mut self, parents: &[VertexId]) -> VertexId {
         self.distance
             .extend([vec![usize::MAX; self.order], vec![0]].concat());
         self.order += 1;
-        let ancestors = parents.iter().fold(HashSet::new(), |mut acc, &p| {
-            acc.extend(&self.ancestors[p]);
-            acc
-        });
-        self.ancestors.push(ancestors);
         self.order - 1
-    }
-
-    /// The set of persistent tags a vertex descends from.
-    pub fn ancestors(&self, v: VertexId) -> &HashSet<u64> {
-        &self.ancestors[v]
-    }
-
-    /// Copies each vertex's ancestor set from `source`, one per entry in `parents`.
-    /// Used when a rebuild re-indexes vertices but must carry provenance for face coloring.
-    pub fn inherit_ancestry(&mut self, source: &Distance, parents: &[VertexId]) {
-        self.ancestors = parents
-            .iter()
-            .map(|&p| source.ancestors[p].clone())
-            .collect();
-        self.next_tag = source.next_tag;
-    }
-
-    /// Wipes vertex ancestry back to a fresh singleton tag per current vertex.
-    /// Left unbounded, repeated merges eventually saturate every vertex's tags to the whole original set, making distinct faces indistinguishable by ancestry alone.
-    pub fn reset_ancestry(&mut self) {
-        self.ancestors = (0..self.order as u64)
-            .map(|tag| HashSet::from([tag]))
-            .collect();
-        self.next_tag = self.order as u64;
     }
 
     /// Deletes a vertex from the matrix
@@ -124,14 +79,6 @@ impl Distance {
                 }
             }
         }
-        distance.ancestors = self
-            .ancestors
-            .iter()
-            .enumerate()
-            .filter(|&(i, _)| i != v)
-            .map(|(_, set)| set.clone())
-            .collect();
-        distance.next_tag = self.next_tag;
         *self = distance;
     }
 

@@ -25,6 +25,9 @@ use ultraviolet::{Vec3, Vec4};
 
 pub type VertexId = usize;
 
+/// Stable, never-reused face identity, carried through every operation for color continuity.
+pub type FaceId = u64;
+
 pub const SPEED_DAMPENING: f32 = 0.92;
 
 /// Margin for the auto-fit Schlegel FOV so extremal vertices don't touch the viewport edge.
@@ -111,12 +114,6 @@ impl Polyhedron {
         (start as u32, end as u32)
     }
 
-    pub fn cache_faces(&mut self) {
-        let side_counts = self.shape.cycles.iter().map(|c| c.len()).collect();
-        self.face_coloring
-            .snapshot(self.shape.ancestors(), side_counts);
-    }
-
     pub fn process_transactions(&mut self, _speed: f32) {
         if let Some(transaction) = self.transactions.first().cloned() {
             use Transaction::*;
@@ -128,14 +125,12 @@ impl Polyhedron {
                         .any(|l| l > 0.05);
 
                     if all_completed {
-                        self.cache_faces();
-
                         // Contract them in the graph
                         self.shape.contract_edges(edges.clone());
                         self.render.contract_edges(edges);
                         self.transactions.remove(0);
 
-                        self.reconcile_face_colors();
+                        self.finalize_face_colors();
                     }
                 }
                 Release(edges) => {
@@ -146,8 +141,6 @@ impl Polyhedron {
                     self.transactions.remove(0);
                     use ConwayMessage::*;
                     use Transaction::*;
-
-                    self.cache_faces();
 
                     let new_transactions = match conway {
                         Dual => {
@@ -179,13 +172,12 @@ impl Polyhedron {
                             vec![Name('c')]
                         }
                         Kis => {
-                            // self.graph.kis(Option::None);
-                            // vec![Name('k')]
-                            todo!()
+                            self.shape.kis(Option::None);
+                            vec![Name('k')]
                         }
                         SplitVertex(n) => {
                             self.split_vertex(n);
-                            self.shape.recompute();
+                            self.shape.recompute_metrics();
                             vec![]
                         }
                         Truncate => {
@@ -222,7 +214,7 @@ impl Polyhedron {
                     self.render.new_capacity(self.shape.order());
                     self.transactions = [new_transactions, self.transactions.clone()].concat();
 
-                    self.reconcile_face_colors();
+                    self.finalize_face_colors();
                 }
                 Name(c) => {
                     if c == 'b' {
@@ -483,15 +475,18 @@ impl Polyhedron {
             .iter()
             .map(|sig| distinct.iter().position(|d| d == sig).unwrap())
             .collect();
-        self.face_coloring.bootstrap(face_colors, next_color_slot);
+        // Construction-time operations may have left parent records; bootstrap starts clean.
+        self.shape.birth_parents.clear();
+        self.face_coloring
+            .bootstrap(self.shape.cycles.ids(), face_colors, next_color_slot);
     }
 
-    fn reconcile_face_colors(&mut self) {
-        let ancestors = self.shape.ancestors();
+    /// Carries face colors across the operation that just completed, keyed purely by face id.
+    fn finalize_face_colors(&mut self) {
         let signatures = self.face_signatures();
-        self.face_coloring.reconcile(ancestors, &signatures);
-        // Reset ancestry now so it never accumulates past one operation (see `Distance::reset_ancestry`).
-        self.shape.reset_ancestry();
+        let birth_parents = std::mem::take(&mut self.shape.birth_parents);
+        self.face_coloring
+            .finalize(self.shape.cycles.ids(), &birth_parents, &signatures);
     }
 
     pub fn moment_vertices(&self, colors: &[crate::render::color::RGBA]) -> Vec<MomentVertex> {
