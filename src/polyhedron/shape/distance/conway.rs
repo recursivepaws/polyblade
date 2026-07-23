@@ -9,32 +9,14 @@ impl Distance {
             self.connect([w, u]);
             self.disconnect([w, v]);
         }
-        // u now represents both original vertices
-        let absorbed = self.ancestors(v).clone();
-        self.ancestors[u].extend(absorbed);
-        // Delete v
+        // Delete v; u now represents both original vertices
         self.delete(v);
     }
 
-    pub fn contract_edges(&mut self, mut edges: Vec<[VertexId; 2]>) {
-        while !edges.is_empty() {
-            // Pop an edge
-            let [w, x] = edges.remove(0);
-            let v = w.max(x);
-            let u = w.min(x);
-
-            // Contract [v, u], deleting v
+    pub fn contract_edges(&mut self, edges: Vec<[VertexId; 2]>) {
+        crate::polyhedron::contract_edge_indices(edges, |v, u| {
             self.contract_edge([v, u]);
-            // Decrement the value of every vertex
-            for [x, w] in &mut edges {
-                if *x > v {
-                    *x -= 1;
-                }
-                if *w > v {
-                    *w -= 1;
-                }
-            }
-        }
+        });
     }
 
     pub fn split_vertex(&mut self, v: VertexId, connections: Vec<VertexId>) -> Vec<[VertexId; 2]> {
@@ -42,7 +24,7 @@ impl Distance {
         let new_cycle: Cycle = Cycle::from(
             vec![v]
                 .into_iter()
-                .chain((1..connections.len()).map(|_| self.insert_from(&[v])))
+                .chain((1..connections.len()).map(|_| self.insert()))
                 .collect(),
         );
 

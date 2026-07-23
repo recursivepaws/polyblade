@@ -9,11 +9,19 @@ impl Polyhedron {
     }
 
     pub fn truncate(&mut self, d: usize) -> Vec<[VertexId; 2]> {
+        // Full truncation is built in one pass and recomputes once.
+        if d == 0 {
+            let (new_edges, parents) = self.shape.truncate();
+            self.render.rebuild_from_parents(&parents);
+            return new_edges;
+        }
+
+        // Selective truncation still uses the slow per-vertex path; perf is a follow-up.
         let mut new_edges = Vec::default();
         for v in self.shape.vertices().rev() {
-            if d == 0 || self.shape.degree(v) == d {
+            if self.shape.degree(v) == d {
                 new_edges.extend(self.split_vertex(v));
-                self.shape.recompute();
+                self.shape.recompute_metrics();
             }
         }
         new_edges
@@ -48,5 +56,23 @@ impl Polyhedron {
 
     pub fn chamfer(&mut self) {
         self.shape.chamfer();
+    }
+
+    pub fn expand(&mut self) {
+        let (parents, _) = self.shape.expand();
+        self.render.rebuild_from_parents(&parents);
+    }
+
+    /// Expands, then returns the face-figure edges to contract for the dual.
+    /// The animated `Dual` transaction drives the contraction; call `dual` to apply it immediately.
+    pub fn begin_dual(&mut self) -> Vec<[VertexId; 2]> {
+        let (parents, face_edges) = self.shape.expand();
+        self.render.rebuild_from_parents(&parents);
+        face_edges
+    }
+
+    pub fn dual(&mut self) {
+        let edges = self.begin_dual();
+        self.contract(edges);
     }
 }

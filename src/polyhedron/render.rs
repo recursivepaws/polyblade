@@ -63,6 +63,13 @@ impl Render {
         self.speeds.extend(vec![Vec3::zero(); n]);
     }
 
+    /// Re-seeds positions after a re-indexing rebuild: new vertex `k` starts at its parent's position.
+    /// Speeds reset to zero so the fresh vertices relax outward from the original corners.
+    pub fn rebuild_from_parents(&mut self, parents: &[VertexId]) {
+        self.positions = parents.iter().map(|&p| self.positions[p]).collect();
+        self.speeds = vec![Vec3::zero(); parents.len()];
+    }
+
     pub fn spring_length(&self, [v, u]: [VertexId; 2]) -> f32 {
         (self.positions[v] - self.positions[u]).mag()
     }
@@ -96,27 +103,10 @@ impl Render {
         self.positions[u] += self.speeds[u];
     }
 
-    pub fn contract_edges(&mut self, mut edges: Vec<[VertexId; 2]>) {
-        // let mut transformed = HashSet::default();
-        while !edges.is_empty() {
-            // Pop an edge
-            let [w, x] = edges.remove(0);
-            let v = w.max(x);
-            let _u = w.min(x);
-            // if transformed.contains(&v) && transformed.contains(&u) {}
-
+    pub fn contract_edges(&mut self, edges: Vec<[VertexId; 2]>) {
+        crate::polyhedron::contract_edge_indices(edges, |v, _| {
             self.positions.remove(v);
             self.speeds.remove(v);
-            // transformed.insert(v);
-
-            for [x, w] in &mut edges {
-                if *x > v {
-                    *x -= 1;
-                }
-                if *w > v {
-                    *w -= 1;
-                }
-            }
-        }
+        });
     }
 }

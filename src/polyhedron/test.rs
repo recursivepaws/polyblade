@@ -1,6 +1,5 @@
 use super::*;
-use crate::render::message::PresetMessage::{self, *};
-use std::fs::create_dir_all;
+use crate::render::message::PresetMessage::*;
 //
 
 impl Polyhedron {}
@@ -9,14 +8,14 @@ use test_case::test_case;
 #[test_case(Polyhedron::preset(&Pyramid(3)); "T")]
 #[test_case(Polyhedron::preset(&Prism(4)); "C")]
 #[test_case(Polyhedron::preset(&Octahedron); "O")]
-// #[test_case(Polyhedron::preset(&Dodecahedron); "D")]
+#[test_case(Polyhedron::preset(&Dodecahedron); "D")]
 #[test_case(Polyhedron::preset(&Icosahedron); "I")]
 // #[test_case({ let mut g = Polyhedron::preset(&Prism(4)); g.truncate(0); g} ; "tC")]
 // #[test_case({ let mut g = Polyhedron::preset(&Octahedron); g.truncate(0); g} ; "tO")]
 // #[test_case({ let mut g = Polyhedron::preset(&Dodecahedron); g.truncate(0); g} ; "tD")]
 fn polytope_apsp(poly: Polyhedron) {
     let mut bfs = poly.clone();
-    bfs.shape.recompute();
+    bfs.shape.recompute_metrics();
     let mut floyd = poly.clone();
     floyd.shape.floyd();
     assert_eq!(bfs.shape, poly.shape);
@@ -33,21 +32,42 @@ fn truncate_contract() {
 }
 
 #[test]
-#[ignore]
 fn ambo() {
-    use PresetMessage::*;
-    let prefix = "tests/ambo/";
-    create_dir_all(prefix).unwrap();
+    // Ambo tetrahedron == octahedron; exercises the one-shot truncate + contraction.
     let mut polyhedron = Polyhedron::preset(&Pyramid(3));
     polyhedron.ambo_contract();
     let octahedron = Polyhedron::preset(&Octahedron);
     assert_eq!(polyhedron.shape, octahedron.shape);
 }
 
-fn apply_ambo(polyhedron: &mut Polyhedron) {
-    polyhedron.cache_faces();
+#[test]
+fn ambo_cube_gives_cuboctahedron() {
+    // Ambo cube: V=12, E=24, F=14 (8 triangles + 6 squares).
+    let mut polyhedron = Polyhedron::preset(&Prism(4));
     polyhedron.ambo_contract();
-    polyhedron.reconcile_face_colors();
+    assert_eq!(polyhedron.shape.order(), 12, "vertex count");
+    assert_eq!(polyhedron.shape.edges().count(), 24, "edge count");
+    assert_eq!(polyhedron.shape.cycles.len(), 14, "face count");
+    assert_eq!(
+        polyhedron.render.positions.len(),
+        12,
+        "render stays in sync"
+    );
+}
+
+fn apply_ambo(polyhedron: &mut Polyhedron) {
+    polyhedron.ambo_contract();
+    polyhedron.finalize_face_colors();
+}
+
+fn apply_expand(polyhedron: &mut Polyhedron) {
+    polyhedron.expand();
+    polyhedron.finalize_face_colors();
+}
+
+fn apply_truncate(polyhedron: &mut Polyhedron) {
+    polyhedron.truncate(0);
+    polyhedron.finalize_face_colors();
 }
 
 /// Every face sharing a `FaceTypeSignature` must share a color.
@@ -68,14 +88,23 @@ fn assert_uniform_colors_per_facetype(polyhedron: &Polyhedron) {
     }
 }
 
-/// The current color for a specific facetype; panics if no face currently has that signature.
-fn color_for_signature(polyhedron: &Polyhedron, target: &FaceTypeSignature) -> usize {
-    let signatures = polyhedron.face_signatures();
-    let i = signatures
+/// Index of the first face with the given signature; panics if none matches.
+fn signature_index(polyhedron: &Polyhedron, target: &FaceTypeSignature) -> usize {
+    polyhedron
+        .face_signatures()
         .iter()
         .position(|sig| sig == target)
-        .unwrap_or_else(|| panic!("no face with signature {target:?}"));
-    polyhedron.face_coloring.colors[i]
+        .unwrap_or_else(|| panic!("no face with signature {target:?}"))
+}
+
+/// The current color slot for a specific facetype.
+fn color_for_signature(polyhedron: &Polyhedron, target: &FaceTypeSignature) -> usize {
+    polyhedron.face_coloring.colors[signature_index(polyhedron, target)]
+}
+
+/// The rendered palette index (what the UI actually shows) for a specific facetype.
+fn render_index_for_signature(polyhedron: &Polyhedron, target: &FaceTypeSignature) -> usize {
+    polyhedron.face_coloring.render_indices[signature_index(polyhedron, target)]
 }
 
 #[test]
@@ -127,6 +156,330 @@ fn ambo_twice_preserves_facetype_colors() {
 }
 
 #[test]
+fn expand_preserves_facetype_colors() {
+    // cube ("C"); every square borders four squares.
+    let mut polyhedron = Polyhedron::preset(&Prism(4));
+    let square = FaceTypeSignature {
+        side_count: 4,
+        neighbor_sides: vec![4, 4, 4, 4],
+    };
+    let square_color = color_for_signature(&polyhedron, &square);
+
+    // rhombicuboctahedron ("eC")
+    apply_expand(&mut polyhedron);
+    assert_uniform_colors_per_facetype(&polyhedron);
+
+    // Original faces persist as squares bordered by squares; must keep their color via ancestry.
+    assert_eq!(color_for_signature(&polyhedron, &square), square_color);
+
+    // Genuinely new facetypes must be distinct from the persisting square.
+    let vertex_figure = FaceTypeSignature {
+        side_count: 3,
+        neighbor_sides: vec![4, 4, 4],
+    };
+    let edge_quad = FaceTypeSignature {
+        side_count: 4,
+        neighbor_sides: vec![3, 3, 4, 4],
+    };
+    assert_ne!(
+        color_for_signature(&polyhedron, &vertex_figure),
+        square_color
+    );
+    assert_ne!(color_for_signature(&polyhedron, &edge_quad), square_color);
+}
+
+#[test]
+fn truncate_preserves_facetype_colors() {
+    // cube ("C"); every square borders four squares.
+    let mut polyhedron = Polyhedron::preset(&Prism(4));
+    let square = FaceTypeSignature {
+        side_count: 4,
+        neighbor_sides: vec![4, 4, 4, 4],
+    };
+    let square_color = color_for_signature(&polyhedron, &square);
+
+    // truncated cube ("tC")
+    apply_truncate(&mut polyhedron);
+    assert_uniform_colors_per_facetype(&polyhedron);
+
+    // Each original square becomes an octagon bordered by 4 triangles + 4 octagons;
+    // it must keep the square's color via ancestry.
+    let octagon = FaceTypeSignature {
+        side_count: 8,
+        neighbor_sides: vec![3, 3, 3, 3, 8, 8, 8, 8],
+    };
+    assert_eq!(color_for_signature(&polyhedron, &octagon), square_color);
+
+    // Vertex-figure triangles are a genuinely new facetype; must differ.
+    let triangle = FaceTypeSignature {
+        side_count: 3,
+        neighbor_sides: vec![8, 8, 8],
+    };
+    assert_ne!(color_for_signature(&polyhedron, &triangle), square_color);
+}
+
+/// The color slot of the first face with the given side count; panics if none matches.
+fn color_by_side(polyhedron: &Polyhedron, side: usize) -> usize {
+    let i = polyhedron
+        .shape
+        .cycles
+        .iter()
+        .position(|c| c.len() == side)
+        .unwrap_or_else(|| panic!("no face with {side} sides"));
+    polyhedron.face_coloring.colors[i]
+}
+
+#[test]
+fn truncate_cuboctahedron_keeps_square_color_on_octagons() {
+    // cube -> ambo -> cuboctahedron (6 squares + 8 triangles).
+    let mut polyhedron = Polyhedron::preset(&Prism(4));
+    apply_ambo(&mut polyhedron);
+    let square = FaceTypeSignature {
+        side_count: 4,
+        neighbor_sides: vec![3, 3, 3, 3],
+    };
+    let square_color = color_for_signature(&polyhedron, &square);
+
+    // truncate -> truncated cuboctahedron; each square becomes an octagon and must keep its color.
+    apply_truncate(&mut polyhedron);
+    assert_uniform_colors_per_facetype(&polyhedron);
+
+    // The octagons descend from the squares, so they inherit the color; the new vertex-figure squares must not steal it.
+    assert_eq!(
+        color_by_side(&polyhedron, 8),
+        square_color,
+        "octagons keep the square color"
+    );
+    assert_ne!(
+        color_by_side(&polyhedron, 4),
+        square_color,
+        "new squares must not steal the square color"
+    );
+}
+
+#[test]
+fn dodecahedron_is_well_formed() {
+    // dual(antiprism 5) then truncate its two degree-5 apexes -> dodecahedron.
+    let polyhedron = Polyhedron::preset(&Dodecahedron);
+    assert_eq!(polyhedron.shape.order(), 20, "vertex count");
+    assert_eq!(polyhedron.shape.edges().count(), 30, "edge count");
+    assert_eq!(polyhedron.shape.cycles.len(), 12, "face count");
+    for c in polyhedron.shape.cycles.iter() {
+        assert_eq!(c.len(), 5, "all faces are pentagons");
+    }
+    for v in polyhedron.shape.vertices() {
+        assert_eq!(polyhedron.shape.degree(v), 3, "vertex {v} degree");
+    }
+    assert_eq!(
+        polyhedron.render.positions.len(),
+        20,
+        "render stays in sync"
+    );
+}
+
+#[test]
+fn dual_cube_gives_octahedron() {
+    // Dual = expand, then contract the returned face-figure edges.
+    let mut polyhedron = Polyhedron::preset(&Prism(4));
+    let edges = polyhedron.begin_dual();
+    polyhedron.contract(edges);
+
+    // Octahedron: V=6, E=12, F=8, all triangles.
+    assert_eq!(polyhedron.shape.order(), 6, "vertex count");
+    assert_eq!(polyhedron.shape.edges().count(), 12, "edge count");
+    assert_eq!(polyhedron.shape.cycles.len(), 8, "face count");
+    for c in polyhedron.shape.cycles.iter() {
+        assert_eq!(c.len(), 3, "all faces are triangles");
+    }
+    assert_eq!(polyhedron.render.positions.len(), 6, "render stays in sync");
+}
+
+#[test]
+fn dual_preserves_triangle_color_continuity() {
+    // Mirrors the Dual transaction: expand (cube -> rhombicuboctahedron), then
+    // contract the face-figures (-> octahedron). The surviving vertex-figure
+    // triangles must keep their color across the contraction.
+    let mut polyhedron = Polyhedron::preset(&Prism(4));
+
+    let edges = polyhedron.begin_dual();
+    polyhedron.finalize_face_colors();
+    let triangle = FaceTypeSignature {
+        side_count: 3,
+        neighbor_sides: vec![4, 4, 4],
+    };
+    let pink_slot = color_for_signature(&polyhedron, &triangle);
+    let pink_render = render_index_for_signature(&polyhedron, &triangle);
+
+    polyhedron.contract(edges);
+    polyhedron.finalize_face_colors();
+    assert_uniform_colors_per_facetype(&polyhedron);
+
+    let octahedron_triangle = FaceTypeSignature {
+        side_count: 3,
+        neighbor_sides: vec![3, 3, 3],
+    };
+    // Both the color slot and — crucially — the rendered palette index must carry over,
+    // since the UI shows `palette[render_index]`, not the slot.
+    assert_eq!(
+        color_for_signature(&polyhedron, &octahedron_triangle),
+        pink_slot,
+        "octahedron triangles keep the rhombicuboctahedron triangle color slot"
+    );
+    assert_eq!(
+        render_index_for_signature(&polyhedron, &octahedron_triangle),
+        pink_render,
+        "octahedron triangles render the same palette color as before"
+    );
+}
+
+#[test]
+fn expand_tetrahedron_survivors_win_normalization() {
+    // In the expanded tetrahedron, 4 surviving triangles and 4 fresh ones share one signature.
+    // The fresh faces must adopt the survivors' slot, since a member-count vote would tie 4-vs-4.
+    let mut polyhedron = Polyhedron::preset(&Pyramid(3));
+    let tetra_triangle = FaceTypeSignature {
+        side_count: 3,
+        neighbor_sides: vec![3, 3, 3],
+    };
+    let tetra_slot = color_for_signature(&polyhedron, &tetra_triangle);
+    let tetra_render = render_index_for_signature(&polyhedron, &tetra_triangle);
+
+    apply_expand(&mut polyhedron);
+    assert_uniform_colors_per_facetype(&polyhedron);
+
+    let cubocta_triangle = FaceTypeSignature {
+        side_count: 3,
+        neighbor_sides: vec![4, 4, 4],
+    };
+    assert_eq!(
+        color_for_signature(&polyhedron, &cubocta_triangle),
+        tetra_slot,
+        "vertex figures adopt the surviving triangles' slot"
+    );
+    assert_eq!(
+        render_index_for_signature(&polyhedron, &cubocta_triangle),
+        tetra_render,
+        "rendered color is unchanged"
+    );
+
+    // The doomed vertex-figure slot dies in normalization before it can touch the palette.
+    // So the edge quads, the only genuinely new facetype, render the very next entry.
+    let square = FaceTypeSignature {
+        side_count: 4,
+        neighbor_sides: vec![3, 3, 3, 3],
+    };
+    assert_eq!(
+        render_index_for_signature(&polyhedron, &square),
+        tetra_render + 1,
+        "a normalization-doomed slot must not consume a palette entry"
+    );
+}
+
+#[test]
+fn kis_children_inherit_parent_color() {
+    // Kis splits every cube face into apex triangles, a brand-new signature.
+    // Parent records make them keep the squares' color instead of minting a fresh one.
+    let mut polyhedron = Polyhedron::preset(&Prism(4));
+    let square = FaceTypeSignature {
+        side_count: 4,
+        neighbor_sides: vec![4, 4, 4, 4],
+    };
+    let square_slot = color_for_signature(&polyhedron, &square);
+    let square_render = render_index_for_signature(&polyhedron, &square);
+
+    polyhedron.shape.kis(Option::None);
+    polyhedron.finalize_face_colors();
+    assert_uniform_colors_per_facetype(&polyhedron);
+
+    assert!(
+        polyhedron
+            .face_coloring
+            .colors
+            .iter()
+            .all(|&c| c == square_slot),
+        "every kis child inherits its parent's slot"
+    );
+    let triangle = FaceTypeSignature {
+        side_count: 3,
+        neighbor_sides: vec![3, 3, 3],
+    };
+    assert_eq!(
+        render_index_for_signature(&polyhedron, &triangle),
+        square_render,
+        "rendered color is unchanged"
+    );
+}
+
+#[test]
+fn survivor_keeps_color_while_freed_colors_rotate_to_the_back() {
+    // The tetrahedron is self-dual. Its surviving face color must never change, but the
+    // transient facetypes created along the way should advance through the palette: a color
+    // freed by a disappearing facetype goes to the back, so the next new facetype picks a
+    // fresh entry rather than recycling the one just freed.
+    let mut polyhedron = Polyhedron::preset(&Pyramid(3));
+    polyhedron.face_coloring.set_palette_len(6);
+    let triangle = FaceTypeSignature {
+        side_count: 3,
+        neighbor_sides: vec![3, 3, 3],
+    };
+    let square = FaceTypeSignature {
+        side_count: 4,
+        neighbor_sides: vec![3, 3, 3, 3],
+    };
+    let tetra_color = render_index_for_signature(&polyhedron, &triangle);
+
+    // First dual: capture the intermediate cuboctahedron's square palette entry.
+    let edges = polyhedron.begin_dual();
+    polyhedron.finalize_face_colors();
+    let first_square = render_index_for_signature(&polyhedron, &square);
+    polyhedron.contract(edges);
+    polyhedron.finalize_face_colors();
+    assert_eq!(
+        render_index_for_signature(&polyhedron, &triangle),
+        tetra_color,
+        "tetrahedron keeps its color after one dual"
+    );
+
+    // Second dual: the recreated square advances to a fresh palette entry (the freed one is
+    // now at the back), and the surviving tetrahedron still holds its original color.
+    let edges = polyhedron.begin_dual();
+    polyhedron.finalize_face_colors();
+    let second_square = render_index_for_signature(&polyhedron, &square);
+    assert_ne!(
+        second_square, first_square,
+        "recreated square advances instead of recycling the just-freed color"
+    );
+    assert_ne!(
+        second_square, tetra_color,
+        "recreated square never collides with the surviving facetype's color"
+    );
+    polyhedron.contract(edges);
+    polyhedron.finalize_face_colors();
+    assert_eq!(
+        render_index_for_signature(&polyhedron, &triangle),
+        tetra_color,
+        "tetrahedron keeps its color after a second dual"
+    );
+}
+
+#[test]
+fn dual_twice_is_identity() {
+    // dd == identity: cube -> octahedron -> cube.
+    let mut polyhedron = Polyhedron::preset(&Prism(4));
+    let edges = polyhedron.begin_dual();
+    polyhedron.contract(edges);
+    let edges = polyhedron.begin_dual();
+    polyhedron.contract(edges);
+
+    assert_eq!(polyhedron.shape.order(), 8, "vertex count");
+    assert_eq!(polyhedron.shape.edges().count(), 12, "edge count");
+    assert_eq!(polyhedron.shape.cycles.len(), 6, "face count");
+    for c in polyhedron.shape.cycles.iter() {
+        assert_eq!(c.len(), 4, "all faces are squares");
+    }
+}
+
+#[test]
 fn ambo_octahedron_gives_distinct_facetype_colors() {
     // octahedron ("O")
     let mut polyhedron = Polyhedron::preset(&Octahedron);
@@ -147,4 +500,62 @@ fn ambo_octahedron_gives_distinct_facetype_colors() {
         color_for_signature(&polyhedron, &triangle),
         color_for_signature(&polyhedron, &square)
     );
+}
+
+/// Drives the real per-frame loop of physics plus transactions until the queue drains.
+fn run_transactions(polyhedron: &mut Polyhedron) {
+    let mut iterations: u64 = 0;
+    while !polyhedron.transactions.is_empty() {
+        // The app's defaults: speed 10.0, frame time capped at 1/60s (render/state.rs).
+        polyhedron.update(10.0, 1.0 / 60.0);
+        iterations += 1;
+        assert!(
+            iterations < 200_000,
+            "transactions failed to converge: {:?}",
+            polyhedron.transactions
+        );
+    }
+}
+
+#[test]
+fn transaction_loop_end_to_end() {
+    use ConwayMessage::*;
+    // Each operation exercised through the animated transaction machinery on a fresh cube.
+    for conway in [Truncate, Dual, Expand, Ambo, Kis, Chamfer] {
+        let mut polyhedron = Polyhedron::preset(&Prism(4));
+        polyhedron.face_coloring.set_palette_len(9);
+        polyhedron
+            .transactions
+            .push(Transaction::Conway(conway.clone()));
+        run_transactions(&mut polyhedron);
+
+        assert_eq!(
+            polyhedron.render.positions.len(),
+            polyhedron.shape.order(),
+            "render in sync after {conway:?}"
+        );
+        assert_eq!(
+            polyhedron.face_coloring.colors.len(),
+            polyhedron.shape.cycles.len(),
+            "colors parallel to faces after {conway:?}"
+        );
+        assert_eq!(
+            polyhedron.face_coloring.render_indices.len(),
+            polyhedron.shape.cycles.len(),
+            "render indices parallel to faces after {conway:?}"
+        );
+        assert_uniform_colors_per_facetype(&polyhedron);
+    }
+
+    // Bevel composes truncate + ambo through nested transactions (with real waits).
+    let mut polyhedron = Polyhedron::preset(&Prism(4));
+    polyhedron.face_coloring.set_palette_len(9);
+    polyhedron
+        .transactions
+        .push(Transaction::Conway(ConwayMessage::Bevel));
+    run_transactions(&mut polyhedron);
+    // Bevel here queues truncate then ambo: V = E(tC) = 36, F = F(tC) + V(tC) = 38.
+    assert_eq!(polyhedron.shape.order(), 36, "bevel vertex count");
+    assert_eq!(polyhedron.shape.cycles.len(), 38, "bevel face count");
+    assert_uniform_colors_per_facetype(&polyhedron);
 }

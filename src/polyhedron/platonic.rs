@@ -6,7 +6,7 @@ impl Polyhedron {
         use PresetMessage::*;
         let mut polyhedron = match preset {
             Octahedron => Self::octahedron(),
-            Dodecahedron => todo!(),
+            Dodecahedron => Self::dodecahedron(),
             Icosahedron => Self::icosahedron(),
             _ => {
                 let shape = match preset {
@@ -27,9 +27,7 @@ impl Polyhedron {
                 }
             }
         };
-        // Bootstrapping is "reconciling from nothing", so reset ancestry here too.
-        // Otherwise e.g. octahedron's internal construction-time ambo leaks into the user's first op.
-        polyhedron.shape.reset_ancestry();
+        // Bootstrapping assigns fresh colors regardless of construction-time operations.
         polyhedron.bootstrap_face_colors();
         polyhedron
     }
@@ -39,6 +37,14 @@ impl Polyhedron {
         polyhedron.ambo_contract();
         polyhedron
     }
+
+    pub fn dodecahedron() -> Polyhedron {
+        let mut graph = Polyhedron::preset(&AntiPrism(5));
+        graph.dual();
+        graph.truncate(5);
+        graph
+    }
+
     pub fn icosahedron() -> Polyhedron {
         let mut graph = Polyhedron::preset(&AntiPrism(5));
         graph.shape.kis(Some(5));

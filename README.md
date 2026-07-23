@@ -31,12 +31,7 @@
     </p>
 </div>
 
-## WARNING
-This software is currently broken. Use the release published on crates.io or 0.1.0 while I fix it, which can be installed using the method below.
-The main branch is not as functional as it once was, but this will be remedied soon post-refactor.
-
-## Installation
-```cargo install polyblade```
+## Running
 
 Note that the `webGPU` demo is available [here](https://polyblade.app). It runs just as smoothly as the native application.
 
@@ -54,11 +49,12 @@ Due to the recent refactor, we're not as far along on this roadmap as we once we
 Rest assured that in due time we will conquer all shapes.
 
 - [x] Ambo
-- [ ] Kis
+- [x] Kis
 - [x] Truncate
 - [ ] Ortho
 - [x] Bevel
-- [ ] Expand
+- [x] Expand
+- [x] Dual
 - [ ] Snub
 - [ ] Join
 - [ ] Zip
@@ -74,14 +70,14 @@ Rest assured that in due time we will conquer all shapes.
 - [ ] "Undo" button
 - [ ] Save and load animations and cycles of `Transaction`s
 - [x] Schlegel diagrams
-- [x] Color pickers
+- [ ] Color pickers
 - [ ] Pokedex entries for polyhedra, point users to wikipedia or polytope wiki when they stumble onto a known entry
-  - [x] Basic functionality
+  - [ ] Basic functionality
   - [ ] Switch from `RON` to `JSON`
   - [ ] Expand pokedex to include more shapes and improve overlap on isomorphic conway strings
   - [ ] Fix pokedex on WASM
-- [ ] Create WASM deployment and add to website as git submodule
-  - [ ] Fix `time` on web for `dual` and related transitions
-  - [x] WebGL compat
-  - [ ] WebGPU compat
+- [ ] Create WASM deployment
+  - [x] Fix `time` on web for `dual` and related transitions
+  - [ ] WebGL compat
+  - [x] WebGPU compat
 - [x] Setup some basic CI integrations

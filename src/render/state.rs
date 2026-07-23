@@ -115,6 +115,10 @@ impl AppState {
             frame_difference
         };
 
+        self.model
+            .polyhedron
+            .face_coloring
+            .set_palette_len(self.render.picker.palette.colors.len());
         self.model.polyhedron.update(self.render.speed, second);
         self.render.frame = time;
 

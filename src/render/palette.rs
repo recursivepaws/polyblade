@@ -39,6 +39,12 @@ impl Palette {
             "#639bff", "#8854f3", "#ff79ae", "#ff8c5c", "#fff982", "#63ffba",
         ])
     }
+    pub fn clement_extended() -> Self {
+        Self::new(&[
+            "#8854f3", "#fff982", "#639bff", "#ff8c5c", "#63ffba", "#ff79ae", "#70f3ff",
+        ])
+    }
+
     pub fn dream_haze() -> Self {
         Self::new(&[
             "#3c42c4", "#6e51c8", "#a065cd", "#ce79d2", "#d68fb8", "#dda2a3", "#eac4ae", "#f4dfbe",
