@@ -2,6 +2,103 @@ use super::{Cycles, Distance, Shape};
 use crate::polyhedron::{FaceId, VertexId};
 use std::collections::{HashMap, HashSet};
 
+/// Canonical (order-independent) key for an undirected edge.
+fn undirected(a: VertexId, b: VertexId) -> [VertexId; 2] {
+    if a < b { [a, b] } else { [b, a] }
+}
+
+/// A read-only snapshot of a shape's faces taken at the start of a Conway operation,
+/// with the incidence data corner/edge/face operations repeatedly need:
+/// - `cycles`/`ids`: the original faces and their stable ids,
+/// - `pos`: O(1) lookup of a vertex's index within a given face,
+/// - `edge_faces`: the faces bordering each original edge.
+///
+/// Operations snapshot once, build their new vertices, then read incidence from here while
+/// emitting the new cycle list. Shared by `expand` and `chamfer`; the intent is that future
+/// corner-based operations (bevel, ortho, gyro, …) build on the same primitives.
+struct FaceTopology {
+    cycles: Vec<Vec<VertexId>>,
+    ids: Vec<FaceId>,
+    /// `pos[f][&v]` is the index of vertex `v` within face `f`.
+    pos: Vec<HashMap<VertexId, usize>>,
+    /// Undirected original edge → bordering face indices (exactly two on a closed polyhedron).
+    edge_faces: HashMap<[VertexId; 2], Vec<usize>>,
+}
+
+impl FaceTopology {
+    fn snapshot(cycles: &Cycles) -> Self {
+        let ids = cycles.ids().to_vec();
+        let cycles: Vec<Vec<VertexId>> =
+            cycles.iter().map(|c| c.iter().copied().collect()).collect();
+        let mut pos: Vec<HashMap<VertexId, usize>> = Vec::with_capacity(cycles.len());
+        let mut edge_faces: HashMap<[VertexId; 2], Vec<usize>> = HashMap::new();
+        for (f, cycle) in cycles.iter().enumerate() {
+            let n = cycle.len();
+            let mut row = HashMap::with_capacity(n);
+            for k in 0..n {
+                row.insert(cycle[k], k);
+                edge_faces
+                    .entry(undirected(cycle[k], cycle[(k + 1) % n]))
+                    .or_default()
+                    .push(f);
+            }
+            pos.push(row);
+        }
+        Self {
+            cycles,
+            ids,
+            pos,
+            edge_faces,
+        }
+    }
+
+    /// Index of vertex `v` within face `f`.
+    fn pos(&self, f: usize, v: VertexId) -> usize {
+        self.pos[f][&v]
+    }
+
+    /// The face across `edge` from `f`, if `edge` is interior (borders exactly two faces).
+    fn other_face(&self, f: usize, a: VertexId, b: VertexId) -> Option<usize> {
+        let faces = self.edge_faces.get(&undirected(a, b))?;
+        (faces.len() == 2).then(|| if faces[0] == f { faces[1] } else { faces[0] })
+    }
+
+    /// Visits each interior original edge exactly once, in face-then-corner order (so ids minted
+    /// per edge stay deterministic), yielding the face `f` it was found in, its endpoints `a,b` in
+    /// `f`'s winding, and the opposite face `g`.
+    fn for_each_interior_edge(&self, mut visit: impl FnMut(usize, VertexId, VertexId, usize)) {
+        let mut seen: HashSet<[VertexId; 2]> = HashSet::new();
+        for (f, cycle) in self.cycles.iter().enumerate() {
+            let n = cycle.len();
+            for k in 0..n {
+                let (a, b) = (cycle[k], cycle[(k + 1) % n]);
+                if seen.insert(undirected(a, b))
+                    && let Some(g) = self.other_face(f, a, b)
+                {
+                    visit(f, a, b, g);
+                }
+            }
+        }
+    }
+}
+
+impl Shape {
+    /// Mints the next never-yet-used face id.
+    fn fresh_face_id(&mut self) -> FaceId {
+        let id = self.next_face_id;
+        self.next_face_id += 1;
+        id
+    }
+
+    /// Installs an explicitly-built face list: canonically sort it and refresh derived metrics.
+    /// Callers that maintain the discovery invariant should follow with `assert_cycles_match_discovery`.
+    fn install_cycles(&mut self, cycles: Vec<Vec<VertexId>>, ids: Vec<FaceId>) {
+        self.cycles = Cycles::new(cycles, ids);
+        self.cycles.sort();
+        self.recompute_metrics();
+    }
+}
+
 impl Shape {
     pub fn split_vertex(&mut self, v: VertexId) -> Vec<[usize; 2]> {
         let sc = self.cycles.sorted_connections(v);
@@ -27,9 +124,9 @@ impl Shape {
         }
         // The corner ring itself is the new vertex-figure face.
         new_cycles.push(corners);
-        new_ids.push(self.next_face_id);
-        self.next_face_id += 1;
+        new_ids.push(self.fresh_face_id());
 
+        // Metrics are recomputed by the caller after splitting, so only rebuild the face list here.
         self.cycles = Cycles::new(new_cycles, new_ids);
         self.cycles.sort();
         self.assert_cycles_match_discovery();
@@ -86,14 +183,11 @@ impl Shape {
         // Each original vertex spawns its vertex-figure d-gon: a genuinely new face.
         for (v, sc) in vertex_order.iter().enumerate() {
             new_cycles.push(sc.iter().map(|&u| corner[&(v, u)]).collect());
-            new_ids.push(self.next_face_id);
-            self.next_face_id += 1;
+            new_ids.push(self.fresh_face_id());
         }
 
         self.distance = distance;
-        self.cycles = Cycles::new(new_cycles, new_ids);
-        self.cycles.sort();
-        self.recompute_metrics();
+        self.install_cycles(new_cycles, new_ids);
         self.assert_cycles_match_discovery();
         (new_edges, parents)
     }
@@ -127,15 +221,13 @@ impl Shape {
             for k in 0..n {
                 self.distance.connect([v, face[k]]);
                 new_cycles.push(vec![v, face[k], face[(k + 1) % n]]);
-                new_ids.push(self.next_face_id);
-                self.birth_parents.insert(self.next_face_id, id);
-                self.next_face_id += 1;
+                let fid = self.fresh_face_id();
+                new_ids.push(fid);
+                self.birth_parents.insert(fid, id);
             }
         }
 
-        self.cycles = Cycles::new(new_cycles, new_ids);
-        self.cycles.sort();
-        self.recompute_metrics();
+        self.install_cycles(new_cycles, new_ids);
         // No discovery oracle here because discovery falsely admits the covered original triangles.
         // The explicit construction is the ground truth, verified by count assertions in tests.
         edges
@@ -144,17 +236,12 @@ impl Shape {
     /// `e` expand / cantellation: one new vertex per original vertex-face corner.
     /// Returns each new vertex's origin (for render re-seeding) and the face-figure edges to contract for the dual.
     pub fn expand(&mut self) -> (Vec<VertexId>, Vec<[VertexId; 2]>) {
-        let cycles: Vec<Vec<VertexId>> = self
-            .cycles
-            .iter()
-            .map(|c| c.iter().copied().collect())
-            .collect();
-        let old_ids: Vec<FaceId> = self.cycles.ids().to_vec();
+        let topo = FaceTopology::snapshot(&self.cycles);
 
-        // Index every (face, corner) incidence; `c[f][i]` is the new vertex there.
-        let mut c: Vec<Vec<VertexId>> = Vec::with_capacity(cycles.len());
+        // Index every (face, corner) incidence; `c[f][i]` is the new vertex at face `f`'s i-th corner.
+        let mut c: Vec<Vec<VertexId>> = Vec::with_capacity(topo.cycles.len());
         let mut parents: Vec<VertexId> = Vec::new();
-        for cycle in &cycles {
+        for cycle in &topo.cycles {
             let row = cycle
                 .iter()
                 .map(|&v| {
@@ -164,25 +251,14 @@ impl Shape {
                 .collect();
             c.push(row);
         }
-
-        // Position of a vertex within a face's cycle.
-        let pos = |f: usize, v: VertexId| cycles[f].iter().position(|&x| x == v).unwrap();
-        // Which two faces each original edge borders.
-        let mut edge_faces: HashMap<[VertexId; 2], Vec<usize>> = HashMap::new();
-        for (f, cycle) in cycles.iter().enumerate() {
-            let n = cycle.len();
-            for k in 0..n {
-                let (a, b) = (cycle[k], cycle[(k + 1) % n]);
-                let edge = if a < b { [a, b] } else { [b, a] };
-                edge_faces.entry(edge).or_default().push(f);
-            }
-        }
+        // The new vertex at face `f`'s copy of vertex `v`.
+        let corner = |f: usize, v: VertexId| c[f][topo.pos(f, v)];
 
         let mut distance = Distance::new(parents.len());
         // Face-figure edges: the original n-gon, using this face's corner copies.
         // Contracting these collapses each face to a point, giving the dual.
         let mut face_edges = Vec::new();
-        for (f, cycle) in cycles.iter().enumerate() {
+        for (f, cycle) in topo.cycles.iter().enumerate() {
             let n = cycle.len();
             for k in 0..n {
                 let edge = [c[f][k], c[f][(k + 1) % n]];
@@ -190,100 +266,70 @@ impl Shape {
                 face_edges.push(edge);
             }
         }
-        // Vertex-figure rungs: link the two faces' copies of each endpoint.
-        for (edge, faces) in &edge_faces {
-            if faces.len() != 2 {
-                continue;
-            }
-            let [f, g] = [faces[0], faces[1]];
-            for &v in edge {
-                distance.connect([c[f][pos(f, v)], c[g][pos(g, v)]]);
-            }
-        }
+        // Vertex-figure rungs: link the two faces' copies of each shared endpoint.
+        topo.for_each_interior_edge(|f, a, b, g| {
+            distance.connect([corner(f, a), corner(g, a)]);
+            distance.connect([corner(f, b), corner(g, b)]);
+        });
 
         // Each original face persists as its corner-copy n-gon, keeping its id.
         let mut new_cycles: Vec<Vec<VertexId>> = c.clone();
-        let mut new_ids: Vec<FaceId> = old_ids;
+        let mut new_ids: Vec<FaceId> = topo.ids.clone();
         // Each original edge spawns a quad, interleaved so each face's copy pair stays adjacent.
-        let mut seen: HashSet<[VertexId; 2]> = HashSet::new();
-        for (f, cycle) in cycles.iter().enumerate() {
-            let n = cycle.len();
-            for k in 0..n {
-                let (a, b) = (cycle[k], cycle[(k + 1) % n]);
-                let edge = if a < b { [a, b] } else { [b, a] };
-                if !seen.insert(edge) {
-                    continue;
-                }
-                let faces = &edge_faces[&edge];
-                if faces.len() != 2 {
-                    continue;
-                }
-                let g = if faces[0] == f { faces[1] } else { faces[0] };
-                new_cycles.push(vec![
-                    c[f][pos(f, a)],
-                    c[f][pos(f, b)],
-                    c[g][pos(g, b)],
-                    c[g][pos(g, a)],
-                ]);
-                new_ids.push(self.next_face_id);
-                self.next_face_id += 1;
-            }
-        }
+        topo.for_each_interior_edge(|f, a, b, g| {
+            new_cycles.push(vec![corner(f, a), corner(f, b), corner(g, b), corner(g, a)]);
+            new_ids.push(self.fresh_face_id());
+        });
         // Each original vertex spawns its vertex-figure by walking the faces around v.
         for v in 0..self.order() {
-            let f0 = (0..cycles.len())
-                .find(|&f| cycles[f].contains(&v))
+            let f0 = (0..topo.cycles.len())
+                .find(|&f| topo.pos[f].contains_key(&v))
                 .expect("vertex belongs to no face");
             let mut figure = Vec::new();
             let mut f = f0;
-            // Enter f0 via its edge (prev, v); the walk exits via (v, next) each step.
+            // Enter f0 via its edge (prev, v); the walk exits via v's other edge each step.
             let mut entry = {
-                let k = pos(f0, v);
-                let prev = cycles[f0][(k + cycles[f0].len() - 1) % cycles[f0].len()];
-                if prev < v { [prev, v] } else { [v, prev] }
+                let cyc = &topo.cycles[f0];
+                let k = topo.pos(f0, v);
+                undirected(cyc[(k + cyc.len() - 1) % cyc.len()], v)
             };
             loop {
-                figure.push(c[f][pos(f, v)]);
-                let k = pos(f, v);
-                let next = cycles[f][(k + 1) % cycles[f].len()];
-                let prev = cycles[f][(k + cycles[f].len() - 1) % cycles[f].len()];
+                figure.push(corner(f, v));
+                let cyc = &topo.cycles[f];
+                let k = topo.pos(f, v);
+                let next = cyc[(k + 1) % cyc.len()];
+                let prev = cyc[(k + cyc.len() - 1) % cyc.len()];
                 // Exit via whichever of v's two edges in f we didn't enter through.
-                let e_next = if next < v { [next, v] } else { [v, next] };
-                let e_prev = if prev < v { [prev, v] } else { [v, prev] };
-                let exit = if e_next == entry { e_prev } else { e_next };
-                let faces = &edge_faces[&exit];
-                debug_assert_eq!(faces.len(), 2, "open edge at vertex figure");
-                f = if faces[0] == f { faces[1] } else { faces[0] };
+                let exit = if undirected(next, v) == entry {
+                    undirected(prev, v)
+                } else {
+                    undirected(next, v)
+                };
+                f = topo
+                    .other_face(f, exit[0], exit[1])
+                    .expect("open edge at vertex figure");
                 entry = exit;
                 if f == f0 {
                     break;
                 }
             }
             new_cycles.push(figure);
-            new_ids.push(self.next_face_id);
-            self.next_face_id += 1;
+            new_ids.push(self.fresh_face_id());
         }
 
         self.distance = distance;
-        self.cycles = Cycles::new(new_cycles, new_ids);
-        self.cycles.sort();
-        self.recompute_metrics();
+        self.install_cycles(new_cycles, new_ids);
         self.assert_cycles_match_discovery();
         (parents, face_edges)
     }
 
     pub fn chamfer(&mut self) {
         let originals = self.edges().collect::<Vec<_>>();
-        let cycles: Vec<Vec<VertexId>> = self
-            .cycles
-            .iter()
-            .map(|c| c.iter().copied().collect())
-            .collect();
-        let old_ids: Vec<FaceId> = self.cycles.ids().to_vec();
+        let topo = FaceTopology::snapshot(&self.cycles);
 
         // Shrink each face: one new vertex per corner, tethered to the original and ringed together.
-        let mut c: Vec<Vec<VertexId>> = Vec::with_capacity(cycles.len());
-        for cycle in &cycles {
+        let mut c: Vec<Vec<VertexId>> = Vec::with_capacity(topo.cycles.len());
+        for cycle in &topo.cycles {
             let row: Vec<VertexId> = cycle
                 .iter()
                 .map(|&v| {
@@ -300,52 +346,26 @@ impl Shape {
         for edge in originals {
             self.distance.disconnect(edge);
         }
-
-        let pos = |f: usize, v: VertexId| cycles[f].iter().position(|&x| x == v).unwrap();
-        let mut edge_faces: HashMap<[VertexId; 2], Vec<usize>> = HashMap::new();
-        for (f, cycle) in cycles.iter().enumerate() {
-            let n = cycle.len();
-            for k in 0..n {
-                let (a, b) = (cycle[k], cycle[(k + 1) % n]);
-                let edge = if a < b { [a, b] } else { [b, a] };
-                edge_faces.entry(edge).or_default().push(f);
-            }
-        }
+        // The shrunk copy at face `f`'s corner for vertex `v`.
+        let corner = |f: usize, v: VertexId| c[f][topo.pos(f, v)];
 
         // Each original face persists as its shrunk copy, keeping its id.
         let mut new_cycles: Vec<Vec<VertexId>> = c.clone();
-        let mut new_ids: Vec<FaceId> = old_ids;
+        let mut new_ids: Vec<FaceId> = topo.ids.clone();
         // Each original edge spawns a hexagon through both faces' shrunk copies.
-        let mut seen: HashSet<[VertexId; 2]> = HashSet::new();
-        for (f, cycle) in cycles.iter().enumerate() {
-            let n = cycle.len();
-            for k in 0..n {
-                let (a, b) = (cycle[k], cycle[(k + 1) % n]);
-                let edge = if a < b { [a, b] } else { [b, a] };
-                if !seen.insert(edge) {
-                    continue;
-                }
-                let faces = &edge_faces[&edge];
-                if faces.len() != 2 {
-                    continue;
-                }
-                let g = if faces[0] == f { faces[1] } else { faces[0] };
-                new_cycles.push(vec![
-                    a,
-                    c[f][pos(f, a)],
-                    c[f][pos(f, b)],
-                    b,
-                    c[g][pos(g, b)],
-                    c[g][pos(g, a)],
-                ]);
-                new_ids.push(self.next_face_id);
-                self.next_face_id += 1;
-            }
-        }
+        topo.for_each_interior_edge(|f, a, b, g| {
+            new_cycles.push(vec![
+                a,
+                corner(f, a),
+                corner(f, b),
+                b,
+                corner(g, b),
+                corner(g, a),
+            ]);
+            new_ids.push(self.fresh_face_id());
+        });
 
-        self.cycles = Cycles::new(new_cycles, new_ids);
-        self.cycles.sort();
-        self.recompute_metrics();
+        self.install_cycles(new_cycles, new_ids);
         self.assert_cycles_match_discovery();
     }
 }
