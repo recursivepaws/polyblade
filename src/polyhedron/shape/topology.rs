@@ -2,26 +2,21 @@ use super::Cycles;
 use crate::polyhedron::{FaceId, VertexId};
 use std::collections::{HashMap, HashSet};
 
-/// Canonical (order-independent) key for an undirected edge.
+/// Order-independent key for an undirected edge.
+/// TODO: maybe we should rewrite this as a custom type
 pub(super) fn undirected(a: VertexId, b: VertexId) -> [VertexId; 2] {
     if a < b { [a, b] } else { [b, a] }
 }
 
-/// A read-only snapshot of a shape's faces taken at the start of a Conway operation,
-/// with the incidence data corner/edge/face operations repeatedly need:
-/// - `cycles`/`ids`: the original faces and their stable ids,
-/// - `pos`: O(1) lookup of a vertex's index within a given face,
-/// - `edge_faces`: the faces bordering each original edge.
-///
-/// Operations snapshot once, build their new vertices, then read incidence from here while
-/// emitting the new cycle list. Shared by `expand` and `chamfer`; the intent is that future
-/// corner-based operations (bevel, ortho, gyro, …) build on the same primitives.
+/// Read-only snapshot of a shape's faces taken at the start of a Conway operation
 pub(super) struct FaceTopology {
+    /// The original faces
     pub(super) cycles: Vec<Vec<VertexId>>,
+    /// The IDs of those original faces
     pub(super) ids: Vec<FaceId>,
-    /// `pos[f][&v]` is the index of vertex `v` within face `f`.
+    /// Vertex `v` in face `f` = pos[f][&v]
     pub(super) pos: Vec<HashMap<VertexId, usize>>,
-    /// Undirected original edge → bordering face indices (exactly two on a closed polyhedron).
+    /// Undirected original edge bordering face indices
     edge_faces: HashMap<[VertexId; 2], Vec<usize>>,
 }
 
@@ -57,20 +52,20 @@ impl FaceTopology {
         self.pos[f][&v]
     }
 
-    /// The face across `edge` from `f`, if `edge` is interior (borders exactly two faces).
+    /// The face across `edge` from `f`, if `edge` is interior aka borders exactly two faces.
     pub(super) fn other_face(&self, f: usize, a: VertexId, b: VertexId) -> Option<usize> {
         let faces = self.edge_faces.get(&undirected(a, b))?;
         (faces.len() == 2).then(|| if faces[0] == f { faces[1] } else { faces[0] })
     }
 
-    /// Visits each interior original edge exactly once, in face-then-corner order (so ids minted
-    /// per edge stay deterministic), yielding the face `f` it was found in, its endpoints `a,b` in
-    /// `f`'s winding, and the opposite face `g`.
+    /// Visits each interior original edge exactly once in face order then corner order.
+    /// Yields the face `f` it was found in, its endpoints `a,b` in `f`'s winding, and the opposite face `g`.
     pub(super) fn for_each_interior_edge(
         &self,
         mut visit: impl FnMut(usize, VertexId, VertexId, usize),
     ) {
         let mut seen: HashSet<[VertexId; 2]> = HashSet::new();
+        // For each face
         for (f, cycle) in self.cycles.iter().enumerate() {
             let n = cycle.len();
             for k in 0..n {
