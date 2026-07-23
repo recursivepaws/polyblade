@@ -74,18 +74,12 @@ impl Cycles {
         cycles
     }
 
-    #[allow(dead_code)]
     pub fn len(&self) -> usize {
         self.cycles.len()
     }
 
     pub fn iter(&self) -> std::slice::Iter<'_, Cycle> {
         self.cycles.iter()
-    }
-
-    #[allow(dead_code)]
-    pub fn into_iter(self) -> std::vec::IntoIter<Cycle> {
-        self.cycles.into_iter()
     }
     /// Returns the
     pub fn sorted_connections(&self, v: VertexId) -> Vec<VertexId> {

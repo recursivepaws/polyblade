@@ -59,14 +59,4 @@ impl Cycle {
     pub fn iter(&self) -> std::slice::Iter<'_, usize> {
         self.0.iter()
     }
-
-    #[allow(dead_code)]
-    pub fn contains(&self, v: &VertexId) -> bool {
-        self.0.contains(v)
-    }
-
-    #[allow(dead_code)]
-    pub fn push(&mut self, v: VertexId) {
-        self.0.push(v);
-    }
 }
