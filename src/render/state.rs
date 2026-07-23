@@ -76,7 +76,7 @@ impl Default for RenderState {
 impl Default for ColorPickerState {
     fn default() -> Self {
         Self {
-            palette: Palette::clement_extended(),
+            palette: Palette::clement(),
             color_index: None,
             picked_color: RGBA::new(0, 0, 0, 255),
             colors: 1,

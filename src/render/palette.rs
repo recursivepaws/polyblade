@@ -41,8 +41,7 @@ impl Palette {
     }
     pub fn clement_extended() -> Self {
         Self::new(&[
-            "#639bff", "#8854f3", "#ff79ae", "#ff8c5c", "#fff982", "#63ffba", "#a0ff70", "#70f3ff",
-            "#ff70ff",
+            "#8854f3", "#fff982", "#639bff", "#ff8c5c", "#63ffba", "#ff79ae", "#70f3ff",
         ])
     }
 
