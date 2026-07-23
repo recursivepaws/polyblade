@@ -181,15 +181,16 @@ impl Cycles {
     /// Survivors keep their ids and faces that degenerate below 3 vertices are dropped.
     pub fn contract_edges(&mut self, edges: Vec<[VertexId; 2]>) {
         crate::polyhedron::contract_edge_indices(edges, |v, u| {
-            let alive: Vec<bool> = self
-                .cycles
-                .iter_mut()
-                .map(|cycle| cycle.contract_vertex(v, u))
-                .collect();
-            let mut it = alive.iter();
-            self.cycles.retain(|_| *it.next().unwrap());
-            let mut it = alive.iter();
-            self.ids.retain(|_| *it.next().unwrap());
+            // Merge `v` into `u` in every face.
+            // Rebuild in a single pass; keep each surviving cycle paired with its id.
+            let cycles = std::mem::take(&mut self.cycles);
+            let ids = std::mem::take(&mut self.ids);
+            for (mut cycle, id) in cycles.into_iter().zip(ids) {
+                if cycle.contract_vertex(v, u) {
+                    self.cycles.push(cycle);
+                    self.ids.push(id);
+                }
+            }
         });
     }
 }

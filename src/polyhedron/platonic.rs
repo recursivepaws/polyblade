@@ -28,7 +28,6 @@ impl Polyhedron {
             }
         };
         // Bootstrapping assigns fresh colors regardless of construction-time operations.
-
         polyhedron.bootstrap_face_colors();
         polyhedron
     }

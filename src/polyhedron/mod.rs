@@ -48,8 +48,10 @@ pub(crate) fn contract_edge_indices(
     mut edges: Vec<[VertexId; 2]>,
     mut delete: impl FnMut(VertexId, VertexId),
 ) {
-    while !edges.is_empty() {
-        let [w, x] = edges.remove(0);
+    let mut i = 0;
+    while i < edges.len() {
+        let [w, x] = edges[i];
+        i += 1;
         // Endpoints already merged (e.g. the last edge of a contracted cycle); nothing to do.
         if w == x {
             continue;
@@ -58,18 +60,14 @@ pub(crate) fn contract_edge_indices(
         let u = w.min(x);
         delete(v, u);
         // Remap the deleted vertex onto the survivor, then close the index gap.
-        for [x, w] in &mut edges {
-            if *x == v {
-                *x = u;
-            }
-            if *w == v {
-                *w = u;
-            }
-            if *x > v {
-                *x -= 1;
-            }
-            if *w > v {
-                *w -= 1;
+        // Only edges still ahead of the cursor need remapping.
+        for [a, b] in &mut edges[i..] {
+            for endpoint in [a, b] {
+                if *endpoint == v {
+                    *endpoint = u;
+                } else if *endpoint > v {
+                    *endpoint -= 1;
+                }
             }
         }
     }
@@ -153,17 +151,9 @@ impl Polyhedron {
                             ]
                         }
                         Join => {
-                            // let edges = self.graph.kis(Option::None);
-                            // vec![
-                            //     //Wait(Instant::now() + Duration::from_secs(1)),
-                            //     Release(edges),
-                            //     Name('j'),
-                            // ]
                             todo!()
                         }
                         Ambo => {
-                            // let edges = self.shape.ambo();
-                            // self.shape.recompute();
                             let edges = self.ambo();
                             vec![Contraction(edges), Name('a')]
                         }
@@ -181,14 +171,6 @@ impl Polyhedron {
                             vec![]
                         }
                         Truncate => {
-                            // let mut operations = vec![];
-                            // for v in self.shape.vertices() {
-                            //     operations.extend(vec![
-                            //         Wait(Instant::now() + Duration::from_millis(1000) * v as u32),
-                            //         Conway(SplitVertex(v)),
-                            //     ]);
-                            // }
-                            // [operations, vec![Name('t')]].concat()
                             self.truncate(0);
                             vec![Name('t')]
                         }
@@ -197,8 +179,6 @@ impl Polyhedron {
                             vec![Name('e')]
                         }
                         Snub => {
-                            // self.graph.expand(true);
-                            // vec![Name('s')]
                             todo!()
                         }
                         Bevel => {
@@ -536,89 +516,4 @@ impl Polyhedron {
             })
             .collect()
     }
-
-    // fn face_positions(&self, face_index: usize) -> Vec<Vec3> {
-    //     self.shape.cycles[face_index]
-    //         .iter()
-    //         .map(|&v| self.render.vertices[v].position)
-    //         .collect()
-    // }
-    // Use a Fibonacci Lattice to spread the points evenly around a sphere
-    // pub fn connect(&mut self, [v, u]: [VertexId; 2]) {
-    //     self.graph.connect([v, u]);
-    // }
-    //
-    // pub fn disconnect(&mut self, [v, u]: [VertexId; 2]) {
-    //     self.graph.disconnect([v, u]);
-    // }
-    //
-    // pub fn insert(&mut self) -> VertexId {
-    //     self.positions
-    //         .push(Vec3::new(random(), random(), random()).normalized());
-    //     self.speeds.push(Vec3::zero());
-    //     self.graph.insert()
-    // }
-
-    // pub fn delete(&mut self, v: VertexId) {
-    //     self.vertices.remove(&v);
-    //
-    //     self.edges = self
-    //         .edges
-    //         .clone()
-    //         .into_iter()
-    //         .filter(|e| !e.contains(v))
-    //         .collect();
-    //
-    //     self.cycles = self
-    //         .cycles
-    //         .clone()
-    //         .into_iter()
-    //         .map(|face| face.into_iter().filter(|&u| u != v).collect())
-    //         .collect();
-    //
-    //     self.positions.remove(&v);
-    //     self.speeds.remove(&v);
-    // }
-    //
-    // /// Edges of a vertex
-    // pub fn edges(&self, v: VertexId) -> Vec<Edge> {
-    //     let mut edges = vec![];
-    //     for u in 0..self.dist.len() {
-    //         if self.dist[v][u] == 1 {
-    //             edges.push((v, u).into());
-    //         }
-    //     }
-    //     edges
-    // }
-
-    // /// Number of faces
-    // pub fn face_count(&self) -> i64 {
-    //     2 + self.edges.len() as i64 - self.vertices.len() as i64
-    // }
-
-    //
-    //
-    //
 }
-
-// impl Display for PolyGraph {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         let mut vertices = self.vertices.iter().collect::<Vec<_>>();
-//         vertices.sort();
-//         let mut adjacents = self.edges.clone().into_iter().collect::<Vec<_>>();
-//         adjacents.sort();
-//
-//         f.write_fmt(format_args!(
-//             "name:\t\t{}\nvertices:\t{:?}\nadjacents:\t{}\nfaces:\t\t{}\n",
-//             self.name,
-//             vertices,
-//             adjacents
-//                 .iter()
-//                 .fold(String::new(), |acc, e| format!("{e}, {acc}")),
-//             self.cycles.iter().fold(String::new(), |acc, f| format!(
-//                 "[{}], {acc}",
-//                 f.iter().fold(String::new(), |acc, x| format!("{x}, {acc}"))
-//             ))
-//         ))
-//     }
-// }
