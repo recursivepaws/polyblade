@@ -70,14 +70,14 @@ Rest assured that in due time we will conquer all shapes.
 - [ ] "Undo" button
 - [ ] Save and load animations and cycles of `Transaction`s
 - [x] Schlegel diagrams
-- [x] Color pickers
+- [ ] Color pickers
 - [ ] Pokedex entries for polyhedra, point users to wikipedia or polytope wiki when they stumble onto a known entry
-  - [x] Basic functionality
+  - [ ] Basic functionality
   - [ ] Switch from `RON` to `JSON`
   - [ ] Expand pokedex to include more shapes and improve overlap on isomorphic conway strings
   - [ ] Fix pokedex on WASM
-- [ ] Create WASM deployment and add to website as git submodule
-  - [ ] Fix `time` on web for `dual` and related transitions
-  - [x] WebGL compat
-  - [ ] WebGPU compat
+- [ ] Create WASM deployment
+  - [x] Fix `time` on web for `dual` and related transitions
+  - [ ] WebGL compat
+  - [x] WebGPU compat
 - [x] Setup some basic CI integrations
