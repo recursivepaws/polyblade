@@ -2,6 +2,7 @@ mod conway;
 mod cycles;
 mod distance;
 mod platonic;
+mod topology;
 use std::{fmt::Display, ops::Range};
 
 use cycles::*;
@@ -74,6 +75,21 @@ impl Shape {
         self.distance.bfs_apsp();
         // Find and save springs
         self.springs = self.distance.springs();
+    }
+
+    /// Mints the next never-yet-used face id.
+    fn fresh_face_id(&mut self) -> FaceId {
+        let id = self.next_face_id;
+        self.next_face_id += 1;
+        id
+    }
+
+    /// Installs an explicitly-built face list: canonically sort it and refresh derived metrics.
+    /// Callers that maintain the discovery invariant should follow with `assert_cycles_match_discovery`.
+    fn install_cycles(&mut self, cycles: Vec<Vec<VertexId>>, ids: Vec<FaceId>) {
+        self.cycles = Cycles::new(cycles, ids);
+        self.cycles.sort();
+        self.recompute_metrics();
     }
 
     /// Debug oracle asserting operation-built cycles equal discovery's, as canonicalized faces in order.
