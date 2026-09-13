@@ -18,6 +18,13 @@ const SCHLEGEL_TIGHTEN_RATE: f32 = 0.02;
 /// Per-tick lerp rate for `schlegel_eye_offset` when it can grow (relax).
 const SCHLEGEL_RELAX_RATE: f32 = 0.25;
 
+/// Pixel-delta-to-radians scale, shared by live drag input and decaying momentum.
+const DRAG_SENSITIVITY: f32 = 0.005;
+/// Per-tick multiplicative decay applied to drag_velocity once the pointer is released.
+const DRAG_FRICTION: f32 = 0.985;
+/// drag_velocity components (px/tick) below this are snapped to zero, ending momentum.
+const DRAG_STOP_EPSILON: f32 = 0.01;
+
 /// Messages queued by the UI, drained by `RenderDriver::tick` each frame. A
 /// global is used because the driver lives inside the render loop (wasm) or
 /// Blitz paint source (native), out of reach of Dioxus event handlers.
@@ -131,6 +138,7 @@ pub enum RenderMessage {
     Schlegel(bool),
     SchlegelFace(FaceTypeSignature),
     Rotating(bool),
+    Dragged { dx: f32, dy: f32 },
     FovChanged(f32),
     ZoomChanged(f32),
     SpeedChanged(f32),
@@ -225,9 +233,19 @@ impl ProcessMessage<RenderState> for RenderMessage {
                 state.rotating = *rotating;
                 if !rotating {
                     state.rotation_duration = Instant::now().duration_since(state.start);
+                    state.dragging = true;
+                    state.drag_velocity = (0.0, 0.0);
                 } else {
                     state.start = Instant::now().checked_sub(state.rotation_duration).unwrap();
+                    state.dragging = false;
                 }
+            }
+            Dragged { dx, dy } => {
+                state.drag_rotation = ultraviolet::Mat4::from_rotation_y(dx * DRAG_SENSITIVITY)
+                    * ultraviolet::Mat4::from_rotation_x(dy * DRAG_SENSITIVITY)
+                    * state.drag_rotation;
+                state.dragging = true;
+                state.drag_velocity = (*dx, *dy);
             }
             FovChanged(fov) => {
                 state.camera.fov_y = *fov;
@@ -280,6 +298,23 @@ impl ProcessMessage<AppState> for PolybladeMessage {
         use PolybladeMessage::*;
         match self {
             Tick(time) => {
+                if !state.render.dragging {
+                    let (vx, vy) = state.render.drag_velocity;
+                    if vx != 0.0 || vy != 0.0 {
+                        state.render.drag_rotation =
+                            ultraviolet::Mat4::from_rotation_y(vx * DRAG_SENSITIVITY)
+                                * ultraviolet::Mat4::from_rotation_x(vy * DRAG_SENSITIVITY)
+                                * state.render.drag_rotation;
+                        let (vx, vy) = (vx * DRAG_FRICTION, vy * DRAG_FRICTION);
+                        state.render.drag_velocity =
+                            if vx.abs() < DRAG_STOP_EPSILON && vy.abs() < DRAG_STOP_EPSILON {
+                                (0.0, 0.0)
+                            } else {
+                                (vx, vy)
+                            };
+                    }
+                }
+
                 state.update_state(*time);
 
                 if state.render.schlegel {

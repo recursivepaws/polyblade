@@ -134,4 +134,5 @@ canvas,
 .canvas-div {
   position: relative;
   flex: 1;
+  touch-action: none;
 }
