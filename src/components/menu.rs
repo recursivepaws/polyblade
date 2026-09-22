@@ -56,7 +56,7 @@ fn SizedPresetMenu(name: String, make: Callback<usize, PresetMessage>) -> Elemen
 /// Polls the backend-published Schlegel face-type options, rendering one button per type.
 /// Only rendered when Schlegel mode is on.
 #[component]
-fn SchlegelFaceMenu() -> Element {
+fn SchlegelFaceMenu(open: Signal<Option<&'static str>>) -> Element {
     let mut options = use_signal(Vec::<FaceTypeOption>::new);
 
     use_future(move || async move {
@@ -77,8 +77,13 @@ fn SchlegelFaceMenu() -> Element {
 
     rsx! {
         div { class: "menu-group top-right",
-            div { class: "menu-btn", "Schlegel Face" }
-            div { class: "dropdown",
+            div {
+                class: "menu-btn",
+                onclick: move |_| toggle(open, "schlegel"),
+                "Schlegel Face"
+            }
+            div {
+                class: if open() == Some("schlegel") { "dropdown open" } else { "dropdown" },
                 for option in options() {
                     div {
                         class: "item",
@@ -98,12 +103,31 @@ fn SchlegelFaceMenu() -> Element {
     }
 }
 
+/// Toggles which top-level menu is open, closing it if already open.
+fn toggle(mut open: Signal<Option<&'static str>>, id: &'static str) {
+    let next = if *open.peek() == Some(id) {
+        None
+    } else {
+        Some(id)
+    };
+    open.set(next);
+}
+
 #[component]
 pub fn MenuBar(mut schlegel: Signal<bool>) -> Element {
+    let mut open = use_signal(|| None::<&'static str>);
     rsx! {
+        if open().is_some() {
+            div { class: "menu-backdrop", onclick: move |_| open.set(None) }
+        }
         div { class: "menu-group",
-            div { class: "menu-btn", "Preset" }
-            div { class: "dropdown",
+            div {
+                class: "menu-btn",
+                onclick: move |_| toggle(open, "preset"),
+                "Preset"
+            }
+            div {
+                class: if open() == Some("preset") { "dropdown open" } else { "dropdown" },
                 div { class: "item has-sub",
                     "Platonic solids"
                     div { class: "submenu",
@@ -123,8 +147,13 @@ pub fn MenuBar(mut schlegel: Signal<bool>) -> Element {
             }
         }
         div { class: "menu-group",
-            div { class: "menu-btn", "Conway" }
-            div { class: "dropdown",
+            div {
+                class: "menu-btn",
+                onclick: move |_| toggle(open, "conway"),
+                "Conway"
+            }
+            div {
+                class: if open() == Some("conway") { "dropdown open" } else { "dropdown" },
                 for op in ConwayMessage::iter() {
                     div {
                         class: "item",
@@ -138,8 +167,13 @@ pub fn MenuBar(mut schlegel: Signal<bool>) -> Element {
             }
         }
         div { class: "menu-group",
-            div { class: "menu-btn", "Render" }
-            div { class: "dropdown",
+            div {
+                class: "menu-btn",
+                onclick: move |_| toggle(open, "render"),
+                "Render"
+            }
+            div {
+                class: if open() == Some("render") { "dropdown open" } else { "dropdown" },
                 div {
                     class: "item",
                     onclick: move |_| {
@@ -153,7 +187,7 @@ pub fn MenuBar(mut schlegel: Signal<bool>) -> Element {
             }
         }
         if schlegel() {
-            SchlegelFaceMenu {}
+            SchlegelFaceMenu { open }
         }
     }
 }
