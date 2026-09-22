@@ -163,6 +163,9 @@ canvas,
     max-height: 45vh;
     overflow-y: auto;
     min-width: 0;
+    background: rgb(55 65 81 / 0.65);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
   }
 
   .submenu {
@@ -170,6 +173,7 @@ canvas,
     display: block;
     min-width: 0;
     padding-left: 16px;
+    background: none;
   }
 
   .has-sub::after {
