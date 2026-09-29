@@ -1,17 +1,8 @@
 body {
-  background-color: #0f1116;
-  color: #ffffff;
-  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-  margin: 20px;
-}
-
-#header {
-  max-width: 1200px;
-}
-
-body {
   background: #0f172a;
   color: #d1d5db;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  margin: 0;
 }
 
 .menu-bar {
@@ -24,6 +15,13 @@ body {
 
 .menu-group {
   position: relative;
+  z-index: 3;
+}
+
+.menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
 }
 
 .menu-group.top-right {
@@ -42,8 +40,10 @@ body {
   cursor: pointer;
 }
 
-.menu-btn:hover {
-  background: #4b5563;
+@media (hover: hover) {
+  .menu-btn:hover {
+    background: #4b5563;
+  }
 }
 
 .dropdown {
@@ -56,7 +56,7 @@ body {
   display: none;
 }
 
-.menu-group:hover .dropdown {
+.dropdown.open {
   display: block;
 }
 
@@ -66,8 +66,10 @@ body {
   position: relative;
 }
 
-.item:hover {
-  background: #4b5563;
+@media (hover: hover) {
+  .item:hover {
+    background: #4b5563;
+  }
 }
 
 .shortcut {
@@ -85,8 +87,10 @@ body {
   display: none;
 }
 
-.item:hover .submenu {
-  display: block;
+@media (hover: hover) {
+  .item:hover .submenu {
+    display: block;
+  }
 }
 
 .has-sub::after {
@@ -104,7 +108,6 @@ canvas,
   position: absolute;
   left: 0;
   top: 0;
-  background_color: #ff00ff;
 }
 
 #wgpu-canvas {
@@ -118,6 +121,7 @@ canvas,
 .main-div {
   margin: 0;
   height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
 }
@@ -135,4 +139,42 @@ canvas,
   position: relative;
   flex: 1;
   touch-action: none;
+}
+
+/* On phones the open dropdown becomes a bottom sheet and submenus flatten inline. */
+@media (max-width: 640px) {
+  .menu-group .dropdown,
+  .menu-group.top-right .dropdown {
+    position: fixed;
+    left: 0;
+    right: 0;
+    top: auto;
+    bottom: 0;
+    max-height: 45vh;
+    overflow-y: auto;
+    min-width: 0;
+    background: rgb(55 65 81 / 0.65);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+  }
+
+  .submenu {
+    position: static;
+    display: block;
+    min-width: 0;
+    padding-left: 16px;
+    background: none;
+  }
+
+  .has-sub::after {
+    content: "▾";
+  }
+
+  .shortcut {
+    display: none;
+  }
+
+  .item {
+    padding: 12px 16px;
+  }
 }
