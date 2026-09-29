@@ -77,13 +77,8 @@ fn SchlegelFaceMenu(open: Signal<Option<&'static str>>) -> Element {
 
     rsx! {
         div { class: "menu-group top-right",
-            div {
-                class: "menu-btn",
-                onclick: move |_| toggle(open, "schlegel"),
-                "Schlegel Face"
-            }
-            div {
-                class: if open() == Some("schlegel") { "dropdown open" } else { "dropdown" },
+            div { class: "menu-btn", onclick: move |_| toggle(open, "schlegel"), "Schlegel Face" }
+            div { class: if open() == Some("schlegel") { "dropdown open" } else { "dropdown" },
                 for option in options() {
                     div {
                         class: "item",
@@ -121,13 +116,8 @@ pub fn MenuBar(mut schlegel: Signal<bool>) -> Element {
             div { class: "menu-backdrop", onclick: move |_| open.set(None) }
         }
         div { class: "menu-group",
-            div {
-                class: "menu-btn",
-                onclick: move |_| toggle(open, "preset"),
-                "Preset"
-            }
-            div {
-                class: if open() == Some("preset") { "dropdown open" } else { "dropdown" },
+            div { class: "menu-btn", onclick: move |_| toggle(open, "preset"), "Preset" }
+            div { class: if open() == Some("preset") { "dropdown open" } else { "dropdown" },
                 div { class: "item has-sub",
                     "Platonic solids"
                     div { class: "submenu",
@@ -147,13 +137,8 @@ pub fn MenuBar(mut schlegel: Signal<bool>) -> Element {
             }
         }
         div { class: "menu-group",
-            div {
-                class: "menu-btn",
-                onclick: move |_| toggle(open, "conway"),
-                "Conway"
-            }
-            div {
-                class: if open() == Some("conway") { "dropdown open" } else { "dropdown" },
+            div { class: "menu-btn", onclick: move |_| toggle(open, "conway"), "Conway" }
+            div { class: if open() == Some("conway") { "dropdown open" } else { "dropdown" },
                 for op in ConwayMessage::iter() {
                     div {
                         class: "item",
@@ -167,13 +152,8 @@ pub fn MenuBar(mut schlegel: Signal<bool>) -> Element {
             }
         }
         div { class: "menu-group",
-            div {
-                class: "menu-btn",
-                onclick: move |_| toggle(open, "render"),
-                "Render"
-            }
-            div {
-                class: if open() == Some("render") { "dropdown open" } else { "dropdown" },
+            div { class: "menu-btn", onclick: move |_| toggle(open, "render"), "Render" }
+            div { class: if open() == Some("render") { "dropdown open" } else { "dropdown" },
                 div {
                     class: "item",
                     onclick: move |_| {
