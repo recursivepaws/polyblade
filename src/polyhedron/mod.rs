@@ -458,8 +458,8 @@ impl Polyhedron {
             .collect()
     }
 
-    /// Cheap change detector for the polydex lookup. Any topology change moves at
-    /// least one of these, including operations that skip the `Name` transaction.
+    /// Cheap change detector for the polydex lookup.
+    /// Any topology change moves one of these, even operations that skip the `Name` transaction.
     pub fn polydex_stamp(&self) -> (String, usize, usize) {
         (
             self.name.clone(),

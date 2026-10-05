@@ -51,8 +51,8 @@ pub fn schlegel_face_options() -> Vec<FaceTypeOption> {
     SCHLEGEL_FACE_OPTIONS.lock().unwrap().clone()
 }
 
-/// What the polydex label shows. `name` falls back to the Conway string and
-/// `category` to "Unknown" for shapes the table doesn't know.
+/// What the polydex label shows.
+/// For shapes the table doesn't know, `name` falls back to the Conway string and `category` to "Unknown".
 #[derive(Clone, Default, PartialEq)]
 pub struct PolydexInfo {
     pub name: String,
@@ -66,15 +66,13 @@ pub struct PolydexInfo {
 type PolydexStamp = (String, usize, usize);
 
 /// Identity of the settled polyhedron, published like the Schlegel options above.
-static POLYDEX: std::sync::Mutex<Option<(PolydexStamp, PolydexInfo)>> =
-    std::sync::Mutex::new(None);
+static POLYDEX: std::sync::Mutex<Option<(PolydexStamp, PolydexInfo)>> = std::sync::Mutex::new(None);
 
 pub fn polydex_info() -> Option<PolydexInfo> {
     POLYDEX.lock().unwrap().as_ref().map(|(_, i)| i.clone())
 }
 
-/// Re-identifies the polyhedron whenever its stamp changes; skipping the lookup
-/// otherwise keeps it off the frame path.
+/// Re-identifies the polyhedron whenever its stamp changes, which keeps the lookup off the frame path.
 fn refresh_polydex(polyhedron: &crate::polyhedron::Polyhedron) {
     let stamp = polyhedron.polydex_stamp();
     let mut slot = POLYDEX.lock().unwrap();

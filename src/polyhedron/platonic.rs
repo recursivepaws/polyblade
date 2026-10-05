@@ -27,8 +27,7 @@ impl Polyhedron {
                 }
             }
         };
-        // Set last: the three solids built above come out of other presets, so they
-        // would otherwise inherit the seed letter of whatever they were built from.
+        // Set last: the three solids above come out of other presets, so they would otherwise inherit a parent's seed letter.
         polyhedron.name = preset.conway_seed();
         // Bootstrapping assigns fresh colors regardless of construction-time operations.
         polyhedron.bootstrap_face_colors();

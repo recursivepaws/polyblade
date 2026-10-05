@@ -606,9 +606,8 @@ fn transaction_loop_end_to_end() {
 
 use crate::render::message::ConwayMessage::{Ambo, Dual, Expand, Gyro, Join, Kis, Snub, Truncate};
 
-/// The polydex table was generated outside the app, so this is the check that the
-/// runtime key agrees with it. Only Conway-reachable solids can be tested this
-/// way; the Johnson solids rest on the generator's own closure and Euler checks.
+/// Checks the runtime key against the table, which was generated outside the app.
+/// Only Conway-reachable solids get here; the Johnson solids rest on the generator's own closure and Euler checks.
 #[test_case(Polyhedron::preset(&Pyramid(3)), "Tetrahedron"; "T")]
 #[test_case(Polyhedron::preset(&Prism(4)), "Cube"; "C")]
 #[test_case(Polyhedron::preset(&Octahedron), "Octahedron"; "O")]

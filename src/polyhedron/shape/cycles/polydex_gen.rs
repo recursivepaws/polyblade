@@ -1,25 +1,5 @@
-//! One-off generator for the `crate::polydex::TABLE` rows.
-//!
-//! Lives inside the `cycles` module because it must call the very same
-//! `orient_faces` + `neighbor_type_signatures` the runtime uses, so a generated
-//! key is byte-identical to what `Polyhedron::polydex_key` produces in the app.
-//!
-//! Run it with `cargo test gen_polydex -- --ignored --nocapture`. Nothing is
-//! fetched: the face lists are vendored in `polydex_source.txt`, one
-//! `index|name|faces` line per solid, extracted from the `:solid` blocks of the
-//! netlib polyhedra database (Andrew Hume and Zvi Har'El's Kaleido, via
-//! <https://netlib.sandia.gov/polyhedra/>) with the coordinates, nets, hinges and
-//! dihedrals dropped and the vertices renumbered from zero.
-//!
-//! Keeping a local copy is not only about being offline. The database is wrong in
-//! places, so the repairs below are the corrections — re-fetching would only
-//! reintroduce the bugs. Files 9-21 (every Archimedean solid) and 32 ship a 2D
-//! net but no `:solid` block, and seven Johnson files are wrong outright. Prisms
-//! and antiprisms are not vendored at all; they are infinite families, so they
-//! are constructed here.
-//!
-//! Every face list is checked for closure and Euler characteristic 2 before it is
-//! keyed, and every key is checked for uniqueness, so nothing silently slips by.
+//! Generator for `crate::polydex::TABLE`: `cargo test gen_polydex -- --ignored --nocapture`.
+//! Lives in `cycles` to reuse the runtime's `orient_faces`, so keys match `Polyhedron::polydex_key` byte for byte.
 
 use super::{neighbor_type_signatures, orient_faces};
 use crate::polyhedron::Polyhedron;
@@ -31,8 +11,8 @@ type Faces = Vec<Vec<usize>>;
 
 const SOURCE: &str = include_str!("polydex_source.txt");
 
-/// Parses `polydex_source.txt` into `(netlib index, name, faces)`. The face list
-/// is empty for the solids netlib only describes as a 2D net.
+/// Parses `polydex_source.txt`, vendored from <https://netlib.sandia.gov/polyhedra/>, into `(index, name, faces)`.
+/// `faces` is empty for the solids netlib only describes as a 2D net.
 fn source() -> Vec<(usize, String, Faces)> {
     SOURCE
         .lines()
@@ -106,10 +86,8 @@ fn degrees(faces: &[Vec<usize>]) -> Vec<usize> {
 }
 
 fn key_from_faces(faces: Faces, label: &str) -> String {
-    // Renumber first: `degrees` sizes by the largest vertex id, so a gap in a
-    // vendored face list would pad the key with degree-0 vertices that no
-    // runtime key can match. `assert_sphere` counts distinct vertices, so
-    // Euler balances across a gap and would not catch it.
+    // `degrees` sizes by the largest vertex id, so a numbering gap would pad the key with degree-0 vertices.
+    // `assert_sphere` counts distinct vertices, so Euler balances across a gap and misses it.
     let mut faces = renumber(&faces);
     assert_sphere(&faces, label);
     let degrees = degrees(&faces);
@@ -137,10 +115,7 @@ fn augment(faces: &[Vec<usize>], face: usize) -> Faces {
 }
 
 /// Joins two solids along an `n`-gon face, dropping the seam face from each.
-///
-/// The rotational offset of the join is not a free choice in general, but it is
-/// for every use here: the seam always lies on an antiprism, whose `n`-gon face
-/// borders `n` triangles and so admits a full cyclic symmetry.
+/// The rotational offset is a free choice here because every seam lies on an antiprism, which has full cyclic symmetry.
 fn glue(a: &[Vec<usize>], b: &[Vec<usize>], n: usize) -> Faces {
     let seam_a = a.iter().position(|f| f.len() == n).unwrap();
     let seam_b = b.iter().position(|f| f.len() == n).unwrap();
@@ -169,25 +144,15 @@ fn glue(a: &[Vec<usize>], b: &[Vec<usize>], n: usize) -> Faces {
 }
 
 /// The seven Johnson files netlib gets wrong, rebuilt from files it gets right.
-///
-/// J22-J25 are each missing one of their antiprism's two triangle rings, so they
-/// are reassembled from their cupola/rotunda and antiprism halves. J64's last
-/// three faces are the same triangle repeated, so it is rebuilt by augmenting
-/// J63. J26 is a three-faces-to-an-edge mess with no clean parent, so its eight
-/// faces are spelled out: two triangular prisms joined on a square face and
-/// turned a quarter turn, with `0..=3` the (discarded) seam square, `4,5` one
-/// ridge and `6,7` the other, perpendicular one.
-///
-/// J37 is the subtle one: netlib's file is a closed, Euler-consistent solid, but
-/// it is the *ortho*bicupola — the rhombicuboctahedron. Nothing local catches
-/// that, since the two are the celebrated pair with identical vertex figures;
-/// only building the gyro version and seeing the face signatures split does.
 fn repaired(index: usize, read: impl Fn(usize) -> Faces) -> Option<Faces> {
     Some(match index {
+        // J22-J25 each lose one of their antiprism's two triangle rings.
         66 => glue(&read(47), &antiprism(6), 6),
         67 => glue(&read(48), &antiprism(8), 8),
         68 => glue(&read(49), &antiprism(10), 10),
         69 => glue(&read(50), &antiprism(10), 10),
+        // J26 is a three-faces-to-an-edge mess with no clean parent, so spell it out.
+        // Two triangular prisms square-glued a quarter turn apart: `0..=3` the discarded seam, `4,5` and `6,7` the ridges.
         70 => vec![
             vec![0, 1, 4],
             vec![2, 3, 5],
@@ -198,6 +163,8 @@ fn repaired(index: usize, read: impl Fn(usize) -> Faces) -> Option<Faces> {
             vec![2, 3, 7, 6],
             vec![0, 1, 6, 7],
         ],
+        // netlib's J37 is closed and Euler-consistent, but it is the orthobicupola, the rhombicuboctahedron.
+        // The two have identical vertex figures, so only building the gyro version and splitting the face signatures catches it.
         81 => {
             // 0..8 bottom octagon, 8..16 top octagon, 16..20 and 20..24 the caps.
             let (bottom, top) = (0, 8);
@@ -214,6 +181,7 @@ fn repaired(index: usize, read: impl Fn(usize) -> Faces) -> Option<Faces> {
             }
             out
         }
+        // J64's last three faces are the same triangle repeated, so rebuild it by augmenting J63.
         108 => {
             let j63 = read(107);
             let mut by_edge: HashMap<[usize; 2], Vec<usize>> = HashMap::new();
@@ -280,8 +248,8 @@ fn polygon(n: usize) -> &'static str {
     ][n - 3]
 }
 
-/// The thirteen Archimedean solids, which netlib has no `:solid` block for,
-/// built from the app's own Conway operators.
+/// The thirteen Archimedean solids, built from the app's own Conway operators.
+/// netlib ships a 2D net but no `:solid` block for any of them.
 fn conway_built(index: usize) -> Option<Polyhedron> {
     let mut p = match index {
         9 => Polyhedron::preset(&Pyramid(3)),
@@ -308,11 +276,8 @@ fn conway_built(index: usize) -> Option<Polyhedron> {
     Some(p)
 }
 
-/// Turns a netlib name into a Wikipedia article title and a category suffix.
-///
-/// netlib's names are lowercase, carry chirality and Johnson numbers in
-/// parentheses, use the older "dipyramid" and "great rhombi-" conventions, and
-/// contain two typos. Returns `(title, Johnson number)`.
+/// Turns a netlib name into `(Wikipedia title, Johnson number)`.
+/// netlib's names are lowercase, parenthesize chirality and Johnson numbers, use older conventions, and hold two typos.
 fn rename(netlib: &str) -> (String, Option<String>) {
     let johnson = netlib
         .split_once("(J")
@@ -339,12 +304,8 @@ fn rename(netlib: &str) -> (String, Option<String>) {
     (title, johnson)
 }
 
-/// Whether en.wikipedia.org has an article at this title.
-///
-/// Verified once, on 2026-10-05, by batching every title through
-/// `api.php?action=query&redirects=1&titles=…` and keeping the ones that came
-/// back without `missing`. 139 of the 141 resolved; the two exceptions are the
-/// largest antiprisms, which only exist as rows in the general antiprism article.
+/// Whether en.wikipedia.org has an article at this title, checked once via the query API on 2026-10-05.
+/// 139 of 141 resolved; the two largest antiprisms are only rows in the general antiprism article.
 fn has_article(title: &str) -> bool {
     !matches!(title, "Hendecagonal antiprism" | "Dodecagonal antiprism")
 }
@@ -372,10 +333,8 @@ fn gen_polydex() {
     // (key, Wikipedia title, category); the title doubles as the display name.
     let mut rows: Vec<(String, String, String)> = Vec::new();
 
-    // Prisms and antiprisms are infinite families, so they are generated rather
-    // than read: netlib stops at ten sides and skips the two that coincide with
-    // Platonic solids. The two degenerate members are skipped here as well, so
-    // the cube and octahedron keep their Platonic names.
+    // Prisms and antiprisms are infinite families, so generate them rather than read: netlib stops at ten sides.
+    // The two that coincide with Platonic solids are skipped, so the cube and octahedron keep their Platonic names.
     for n in 3..=12 {
         for (faces, kind) in [(prism(n), "Prism"), (antiprism(n), "Antiprism")] {
             if (n == 4 && kind == "Prism") || (n == 3 && kind == "Antiprism") {

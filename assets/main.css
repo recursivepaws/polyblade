@@ -15,8 +15,7 @@ body {
 
 .menu-group {
   position: relative;
-  /* Above .polydex, which sits later in DOM order and would otherwise paint
-     over an open dropdown on a short viewport. */
+  /* Above .polydex, which is later in DOM order and would cover an open dropdown. */
   z-index: 4;
 }
 
@@ -143,7 +142,7 @@ canvas,
   touch-action: none;
 }
 
-/* Polydex: names the current solid in the bottom-right corner, over the canvas. */
+/* Names the current solid in the bottom-right corner, over the canvas. */
 .polydex {
   position: fixed;
   right: 16px;
@@ -228,7 +227,7 @@ canvas,
     display: none;
   }
 
-  /* The bottom sheet lands where the polydex label sits, so yield to it. */
+  /* The bottom sheet lands on the polydex label, so yield to it. */
   .main-div:has(.dropdown.open) .polydex {
     display: none;
   }

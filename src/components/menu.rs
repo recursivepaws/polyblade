@@ -53,8 +53,8 @@ fn SizedPresetMenu(name: String, make: Callback<usize, PresetMessage>) -> Elemen
     }
 }
 
-/// Names the polyhedron currently on screen, in the corner. Polls the backend
-/// the same way `SchlegelFaceMenu` does.
+/// Names the polyhedron currently on screen, in the corner.
+/// Polls the backend the same way `SchlegelFaceMenu` does.
 #[component]
 pub fn PolydexLabel() -> Element {
     let mut info = use_signal(|| None::<PolydexInfo>);
