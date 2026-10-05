@@ -62,28 +62,35 @@ pub struct PolydexInfo {
     pub wiki: String,
 }
 
+/// Conway name, vertex count, face count; see `Polyhedron::polydex_stamp`.
+type PolydexStamp = (String, usize, usize);
+
 /// Identity of the settled polyhedron, published like the Schlegel options above.
-static POLYDEX: std::sync::Mutex<Option<PolydexInfo>> = std::sync::Mutex::new(None);
+static POLYDEX: std::sync::Mutex<Option<(PolydexStamp, PolydexInfo)>> =
+    std::sync::Mutex::new(None);
 
 pub fn polydex_info() -> Option<PolydexInfo> {
-    POLYDEX.lock().unwrap().clone()
+    POLYDEX.lock().unwrap().as_ref().map(|(_, i)| i.clone())
 }
 
-/// Re-identifies the polyhedron whenever its Conway name changes. `Name` is the
-/// last transaction of every operation sequence, so a changed name means the
-/// topology has settled; skipping the lookup otherwise keeps it off the frame path.
+/// Re-identifies the polyhedron whenever its stamp changes; skipping the lookup
+/// otherwise keeps it off the frame path.
 fn refresh_polydex(polyhedron: &crate::polyhedron::Polyhedron) {
+    let stamp = polyhedron.polydex_stamp();
     let mut slot = POLYDEX.lock().unwrap();
-    if slot.as_ref().is_some_and(|i| i.conway == polyhedron.name) {
+    if slot.as_ref().is_some_and(|(s, _)| *s == stamp) {
         return;
     }
     let entry = crate::polydex::lookup(&polyhedron.polydex_key());
-    *slot = Some(PolydexInfo {
-        name: entry.map_or_else(|| polyhedron.name.clone(), |e| e.name.to_string()),
-        category: entry.map_or("Unknown", |e| e.category).to_string(),
-        conway: polyhedron.name.clone(),
-        wiki: entry.map_or("", |e| e.wiki).to_string(),
-    });
+    *slot = Some((
+        stamp,
+        PolydexInfo {
+            name: entry.map_or_else(|| polyhedron.name.clone(), |e| e.name.to_string()),
+            category: entry.map_or("Unknown", |e| e.category).to_string(),
+            conway: polyhedron.name.clone(),
+            wiki: entry.map_or("", |e| e.wiki).to_string(),
+        },
+    ));
 }
 
 #[derive(Debug, Clone, Display)]

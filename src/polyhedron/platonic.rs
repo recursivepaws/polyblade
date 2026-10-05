@@ -19,7 +19,7 @@ impl Polyhedron {
                 let render = Render::new(shape.order());
 
                 Polyhedron {
-                    name: preset.conway_seed(),
+                    name: String::new(),
                     shape,
                     render,
                     transactions: vec![],

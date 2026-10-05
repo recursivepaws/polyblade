@@ -105,7 +105,12 @@ fn degrees(faces: &[Vec<usize>]) -> Vec<usize> {
     degrees
 }
 
-fn key_from_faces(mut faces: Faces, label: &str) -> String {
+fn key_from_faces(faces: Faces, label: &str) -> String {
+    // Renumber first: `degrees` sizes by the largest vertex id, so a gap in a
+    // vendored face list would pad the key with degree-0 vertices that no
+    // runtime key can match. `assert_sphere` counts distinct vertices, so
+    // Euler balances across a gap and would not catch it.
+    let mut faces = renumber(&faces);
     assert_sphere(&faces, label);
     let degrees = degrees(&faces);
     orient_faces(&mut faces);

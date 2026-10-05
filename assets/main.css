@@ -15,7 +15,9 @@ body {
 
 .menu-group {
   position: relative;
-  z-index: 3;
+  /* Above .polydex, which sits later in DOM order and would otherwise paint
+     over an open dropdown on a short viewport. */
+  z-index: 4;
 }
 
 .menu-backdrop {
