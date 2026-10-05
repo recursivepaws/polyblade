@@ -1,4 +1,6 @@
 mod cycle;
+#[cfg(test)]
+mod polydex_gen;
 use crate::polyhedron::{FaceId, VertexId};
 use crate::render::pipeline::ShapeVertex;
 pub use cycle::*;

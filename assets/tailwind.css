@@ -600,8 +600,24 @@ video {
   position: fixed;
 }
 
+.absolute {
+  position: absolute;
+}
+
+.relative {
+  position: relative;
+}
+
 .isolate {
   isolation: isolate;
+}
+
+.block {
+  display: block;
+}
+
+.table {
+  display: table;
 }
 
 .hidden {
@@ -628,6 +644,14 @@ video {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.border {
+  border-width: 1px;
+}
+
+.lowercase {
+  text-transform: lowercase;
 }
 
 .outline {

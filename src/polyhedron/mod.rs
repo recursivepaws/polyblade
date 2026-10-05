@@ -458,6 +458,16 @@ impl Polyhedron {
             .collect()
     }
 
+    /// Topological fingerprint for the polydex lookup; see `crate::polydex::key`.
+    pub fn polydex_key(&self) -> String {
+        let degrees: Vec<usize> = self
+            .shape
+            .vertices()
+            .map(|v| self.shape.degree(v))
+            .collect();
+        crate::polydex::key(&degrees, &self.face_signatures())
+    }
+
     /// Fresh, no-history color assignment: one slot per distinct signature, sorted canonically.
     /// Used when there's no prior shape to preserve continuity from (construction time).
     fn bootstrap_face_colors(&mut self) {

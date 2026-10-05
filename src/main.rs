@@ -5,7 +5,7 @@ use polyblade::render::message::{
 };
 
 mod components;
-use components::MenuBar;
+use components::{MenuBar, PolydexLabel};
 
 #[cfg(target_arch = "wasm32")]
 use {
@@ -70,6 +70,7 @@ fn Navbar() -> Element {
                 MenuBar { schlegel }
             }
             Outlet::<Route> {}
+            PolydexLabel {}
         }
     }
 }

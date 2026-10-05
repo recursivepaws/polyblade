@@ -585,7 +585,7 @@ fn transaction_loop_end_to_end() {
     for c in polyhedron.shape.cycles.iter() {
         assert_eq!(c.len(), 5, "all gyro cube faces are pentagons");
     }
-    assert_eq!(polyhedron.name, "gCube", "gyro name");
+    assert_eq!(polyhedron.name, "gC", "gyro name");
     assert_uniform_colors_per_facetype(&polyhedron);
 
     // Join composes ambo + dual: join cube is the rhombic dodecahedron.
@@ -600,6 +600,67 @@ fn transaction_loop_end_to_end() {
     for c in polyhedron.shape.cycles.iter() {
         assert_eq!(c.len(), 4, "all join cube faces are rhombi");
     }
-    assert_eq!(polyhedron.name, "jCube", "join name");
+    assert_eq!(polyhedron.name, "jC", "join name");
     assert_uniform_colors_per_facetype(&polyhedron);
+}
+
+use crate::render::message::ConwayMessage::{Ambo, Dual, Expand, Gyro, Join, Kis, Snub, Truncate};
+
+/// The polydex table was generated outside the app, so this is the check that the
+/// runtime key agrees with it. Only Conway-reachable solids can be tested this
+/// way; the Johnson solids rest on the generator's own closure and Euler checks.
+#[test_case(Polyhedron::preset(&Pyramid(3)), "Tetrahedron"; "T")]
+#[test_case(Polyhedron::preset(&Prism(4)), "Cube"; "C")]
+#[test_case(Polyhedron::preset(&Octahedron), "Octahedron"; "O")]
+#[test_case(Polyhedron::preset(&Dodecahedron), "Dodecahedron"; "D")]
+#[test_case(Polyhedron::preset(&Icosahedron), "Icosahedron"; "I")]
+#[test_case(Polyhedron::preset(&Prism(3)), "Triangular prism"; "P3")]
+#[test_case(Polyhedron::preset(&Prism(7)), "Heptagonal prism"; "P7")]
+#[test_case(Polyhedron::preset(&AntiPrism(5)), "Pentagonal antiprism"; "A5")]
+#[test_case(Polyhedron::preset(&Pyramid(4)), "Square pyramid"; "J1")]
+#[test_case(Polyhedron::preset(&Pyramid(5)), "Pentagonal pyramid"; "J2")]
+#[test_case(conway(&Pyramid(3), &[Truncate]), "Truncated tetrahedron"; "tT")]
+#[test_case(conway(&Prism(4), &[Ambo]), "Cuboctahedron"; "aC")]
+#[test_case(conway(&Prism(4), &[Truncate]), "Truncated cube"; "tC")]
+#[test_case(conway(&Octahedron, &[Truncate]), "Truncated octahedron"; "tO")]
+#[test_case(conway(&Prism(4), &[Expand]), "Rhombicuboctahedron"; "eC")]
+#[test_case(conway(&Prism(4), &[Ambo, Truncate]), "Truncated cuboctahedron"; "taC")]
+#[test_case(conway(&Prism(4), &[Snub]), "Snub cube"; "sC")]
+#[test_case(conway(&Dodecahedron, &[Ambo]), "Icosidodecahedron"; "aD")]
+#[test_case(conway(&Dodecahedron, &[Truncate]), "Truncated dodecahedron"; "tD")]
+#[test_case(conway(&Icosahedron, &[Truncate]), "Truncated icosahedron"; "tI")]
+#[test_case(conway(&Dodecahedron, &[Expand]), "Rhombicosidodecahedron"; "eD")]
+#[test_case(conway(&Dodecahedron, &[Ambo, Truncate]), "Truncated icosidodecahedron"; "taD")]
+#[test_case(conway(&Dodecahedron, &[Snub]), "Snub dodecahedron"; "sD")]
+#[test_case(conway(&Prism(4), &[Join]), "Rhombic dodecahedron"; "jC")]
+#[test_case(conway(&Dodecahedron, &[Join]), "Rhombic triacontahedron"; "jD")]
+#[test_case(conway(&Pyramid(3), &[Kis]), "Triakis tetrahedron"; "kT")]
+#[test_case(conway(&Prism(4), &[Kis]), "Tetrakis hexahedron"; "kC")]
+#[test_case(conway(&Octahedron, &[Kis]), "Triakis octahedron"; "kO")]
+#[test_case(conway(&Dodecahedron, &[Kis]), "Pentakis dodecahedron"; "kD")]
+#[test_case(conway(&Icosahedron, &[Kis]), "Triakis icosahedron"; "kI")]
+#[test_case(conway(&Prism(4), &[Expand, Dual]), "Deltoidal icositetrahedron"; "deC")]
+#[test_case(conway(&Dodecahedron, &[Expand, Dual]), "Deltoidal hexecontahedron"; "deD")]
+#[test_case(conway(&Prism(4), &[Gyro]), "Pentagonal icositetrahedron"; "gC")]
+#[test_case(conway(&Dodecahedron, &[Gyro]), "Pentagonal hexecontahedron"; "gD")]
+#[test_case(conway(&Prism(4), &[Ambo, Truncate, Dual]), "Disdyakis dodecahedron"; "dtaC")]
+#[test_case(conway(&Dodecahedron, &[Ambo, Truncate, Dual]), "Disdyakis triacontahedron"; "dtaD")]
+fn polydex_names(polyhedron: Polyhedron, expected: &str) {
+    let key = polyhedron.polydex_key();
+    let entry =
+        crate::polydex::lookup(&key).unwrap_or_else(|| panic!("no polydex entry for {key}"));
+    assert_eq!(entry.name, expected, "key {key}");
+}
+
+/// Applies Conway operators in order, running each to completion.
+fn conway(preset: &PresetMessage, ops: &[ConwayMessage]) -> Polyhedron {
+    let mut polyhedron = Polyhedron::preset(preset);
+    polyhedron.face_coloring.set_palette_len(9);
+    for op in ops {
+        polyhedron
+            .transactions
+            .push(Transaction::Conway(op.clone()));
+        run_transactions(&mut polyhedron);
+    }
+    polyhedron
 }

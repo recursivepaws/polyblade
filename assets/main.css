@@ -141,6 +141,58 @@ canvas,
   touch-action: none;
 }
 
+/* Polydex: names the current solid in the bottom-right corner, over the canvas. */
+.polydex {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 3;
+  padding: 10px 14px;
+  border-radius: 6px;
+  border: 1px solid rgb(148 163 184 / 0.25);
+  background: rgb(15 23 42 / 0.82);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  text-align: right;
+  line-height: 1.45;
+  pointer-events: none;
+}
+
+.polydex-name {
+  font-size: 1.1em;
+  font-weight: 600;
+  color: #f1f5f9;
+}
+
+.polydex-meta {
+  font-size: 0.85em;
+  color: #cbd5e1;
+}
+
+.polydex-conway {
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgb(148 163 184 / 0.18);
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  color: #e2e8f0;
+}
+
+.polydex-wiki {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 0.85em;
+  color: #93c5fd;
+  text-decoration: none;
+  pointer-events: auto;
+}
+
+@media (hover: hover) {
+  .polydex-wiki:hover {
+    text-decoration: underline;
+  }
+}
+
 /* On phones the open dropdown becomes a bottom sheet and submenus flatten inline. */
 @media (max-width: 640px) {
   .menu-group .dropdown,
@@ -171,6 +223,11 @@ canvas,
   }
 
   .shortcut {
+    display: none;
+  }
+
+  /* The bottom sheet lands where the polydex label sits, so yield to it. */
+  .main-div:has(.dropdown.open) .polydex {
     display: none;
   }
 

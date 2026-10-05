@@ -19,7 +19,7 @@ impl Polyhedron {
                 let render = Render::new(shape.order());
 
                 Polyhedron {
-                    name: preset.to_string(),
+                    name: preset.conway_seed(),
                     shape,
                     render,
                     transactions: vec![],
@@ -27,6 +27,9 @@ impl Polyhedron {
                 }
             }
         };
+        // Set last: the three solids built above come out of other presets, so they
+        // would otherwise inherit the seed letter of whatever they were built from.
+        polyhedron.name = preset.conway_seed();
         // Bootstrapping assigns fresh colors regardless of construction-time operations.
         polyhedron.bootstrap_face_colors();
         polyhedron

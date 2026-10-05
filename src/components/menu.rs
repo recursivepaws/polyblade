@@ -2,8 +2,8 @@ use cfg_if::cfg_if;
 use dioxus::prelude::*;
 use polyblade::polyhedron::face::FaceTypeOption;
 use polyblade::render::message::{
-    ConwayMessage, PolybladeMessage, PresetMessage, RenderMessage, push_message,
-    schlegel_face_options,
+    ConwayMessage, PolybladeMessage, PolydexInfo, PresetMessage, RenderMessage, polydex_info,
+    push_message, schlegel_face_options,
 };
 use strum::IntoEnumIterator;
 
@@ -47,6 +47,51 @@ fn SizedPresetMenu(name: String, make: Callback<usize, PresetMessage>) -> Elemen
                         onclick: move |_| push_message(PolybladeMessage::Preset(make(n))),
                         "{make(n)}"
                     }
+                }
+            }
+        }
+    }
+}
+
+/// Names the polyhedron currently on screen, in the corner. Polls the backend
+/// the same way `SchlegelFaceMenu` does.
+#[component]
+pub fn PolydexLabel() -> Element {
+    let mut info = use_signal(|| None::<PolydexInfo>);
+
+    use_future(move || async move {
+        loop {
+            let new_info = polydex_info();
+            if new_info != *info.peek() {
+                info.set(new_info);
+            }
+            cfg_if! {
+                if #[cfg(target_arch = "wasm32")] {
+                    polyblade::next_animation_frame().await;
+                } else {
+                    tokio::time::sleep(std::time::Duration::from_millis(16)).await;
+                }
+            }
+        }
+    });
+
+    let Some(info) = info() else {
+        return rsx! {};
+    };
+    rsx! {
+        div { class: "polydex",
+            div { class: "polydex-name", "{info.name}" }
+            div { class: "polydex-meta",
+                "{info.category}"
+                span { class: "polydex-conway", "{info.conway}" }
+            }
+            if !info.wiki.is_empty() {
+                a {
+                    class: "polydex-wiki",
+                    href: "https://en.wikipedia.org/wiki/{info.wiki}",
+                    target: "_blank",
+                    rel: "noopener",
+                    "Wikipedia ↗"
                 }
             }
         }
