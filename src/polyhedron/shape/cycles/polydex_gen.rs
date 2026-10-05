@@ -4,22 +4,22 @@
 //! `orient_faces` + `neighbor_type_signatures` the runtime uses, so a generated
 //! key is byte-identical to what `Polyhedron::polydex_key` produces in the app.
 //!
-//! Face lists come from the netlib polyhedra database, which covers the Platonic
-//! and Archimedean solids, the Catalan solids, and all 92 Johnson solids. Prisms
-//! and antiprisms are generated here instead, since they are infinite families.
+//! Run it with `cargo test gen_polydex -- --ignored --nocapture`. Nothing is
+//! fetched: the face lists are vendored in `polydex_source.txt`, one
+//! `index|name|faces` line per solid, extracted from the `:solid` blocks of the
+//! netlib polyhedra database (Andrew Hume and Zvi Har'El's Kaleido, via
+//! <https://netlib.sandia.gov/polyhedra/>) with the coordinates, nets, hinges and
+//! dihedrals dropped and the vertices renumbered from zero.
 //!
-//! ```sh
-//! mkdir -p /tmp/netlib
-//! for i in $(seq 0 141); do
-//!   curl -sf "https://netlib.sandia.gov/polyhedra/$i" -o /tmp/netlib/$i
-//! done
-//! NETLIB_DIR=/tmp/netlib cargo test gen_polydex -- --ignored --nocapture
-//! ```
+//! Keeping a local copy is not only about being offline. The database is wrong in
+//! places, so the repairs below are the corrections — re-fetching would only
+//! reintroduce the bugs. Files 9-21 (every Archimedean solid) and 32 ship a 2D
+//! net but no `:solid` block, and seven Johnson files are wrong outright. Prisms
+//! and antiprisms are not vendored at all; they are infinite families, so they
+//! are constructed here.
 //!
-//! The database is not clean, hence the repairs below. Files 9-21 (every
-//! Archimedean solid) and 32 ship a 2D net but no `:solid` block, and seven
-//! Johnson files are wrong. Every face list is checked for closure and Euler
-//! characteristic 2 before it is keyed, so nothing silently slips by.
+//! Every face list is checked for closure and Euler characteristic 2 before it is
+//! keyed, and every key is checked for uniqueness, so nothing silently slips by.
 
 use super::{neighbor_type_signatures, orient_faces};
 use crate::polyhedron::Polyhedron;
@@ -29,17 +29,26 @@ use std::collections::{BTreeSet, HashMap};
 
 type Faces = Vec<Vec<usize>>;
 
-/// Splits a netlib file into its `:block` sections.
-fn blocks(text: &str) -> HashMap<&str, Vec<&str>> {
-    let mut sections = HashMap::new();
-    let mut current = "";
-    for line in text.lines() {
-        match line.strip_prefix(':') {
-            Some(name) => current = name,
-            None => sections.entry(current).or_insert_with(Vec::new).push(line),
-        }
-    }
-    sections
+const SOURCE: &str = include_str!("polydex_source.txt");
+
+/// Parses `polydex_source.txt` into `(netlib index, name, faces)`. The face list
+/// is empty for the solids netlib only describes as a 2D net.
+fn source() -> Vec<(usize, String, Faces)> {
+    SOURCE
+        .lines()
+        .map(|line| {
+            let mut fields = line.split('|');
+            let index = fields.next().unwrap().parse().unwrap();
+            let name = fields.next().unwrap().to_string();
+            let faces = fields
+                .next()
+                .unwrap()
+                .split_terminator(';')
+                .map(|face| face.split(',').map(|v| v.parse().unwrap()).collect())
+                .collect();
+            (index, name, faces)
+        })
+        .collect()
 }
 
 /// Compacts vertex ids down to `0..n`, preserving relative order.
@@ -55,23 +64,6 @@ fn renumber(faces: &[Vec<usize>]) -> Faces {
         .iter()
         .map(|f| f.iter().map(|v| used.binary_search(v).unwrap()).collect())
         .collect()
-}
-
-/// Reads a `:solid` face block, dropping its header line. The vertex indices are
-/// absolute into a `:vertices` list whose leading rows belong to the 2D net, so
-/// only the ones actually referenced survive renumbering.
-fn faces(block: &[&str]) -> Faces {
-    renumber(
-        &block[1..]
-            .iter()
-            .map(|line| {
-                line.split_whitespace()
-                    .skip(1)
-                    .map(|v| v.parse().unwrap())
-                    .collect()
-            })
-            .collect::<Faces>(),
-    )
 }
 
 /// Undirected edge set, with how many faces border each edge.
@@ -187,10 +179,10 @@ fn glue(a: &[Vec<usize>], b: &[Vec<usize>], n: usize) -> Faces {
 /// only building the gyro version and seeing the face signatures split does.
 fn repaired(index: usize, read: impl Fn(usize) -> Faces) -> Option<Faces> {
     Some(match index {
-        66 => glue(&read(47), &read(29), 6),
-        67 => glue(&read(48), &read(30), 8),
-        68 => glue(&read(49), &read(31), 10),
-        69 => glue(&read(50), &read(31), 10),
+        66 => glue(&read(47), &antiprism(6), 6),
+        67 => glue(&read(48), &antiprism(8), 8),
+        68 => glue(&read(49), &antiprism(10), 10),
+        69 => glue(&read(50), &antiprism(10), 10),
         70 => vec![
             vec![0, 1, 4],
             vec![2, 3, 5],
@@ -362,12 +354,15 @@ fn category(index: usize) -> &'static str {
 }
 
 #[test]
-#[ignore = "one-off table generator; needs NETLIB_DIR"]
+#[ignore = "one-off table generator; prints rows for crate::polydex::TABLE"]
 fn gen_polydex() {
-    let dir = std::env::var("NETLIB_DIR").expect("set NETLIB_DIR to the downloaded netlib files");
+    let source = source();
     let read = |index: usize| -> Faces {
-        let text = std::fs::read_to_string(format!("{dir}/{index}")).unwrap();
-        faces(&blocks(&text)["solid"])
+        let (_, _, faces) = source
+            .iter()
+            .find(|(i, ..)| *i == index)
+            .unwrap_or_else(|| panic!("no vendored face list for {index}"));
+        faces.clone()
     };
     // (key, Wikipedia title, category); the title doubles as the display name.
     let mut rows: Vec<(String, String, String)> = Vec::new();
@@ -386,52 +381,21 @@ fn gen_polydex() {
         }
     }
 
-    // 5-8 (Kepler-Poinsot), 22-31 (prisms, generated above) and 137-141
-    // (non-convex) are all skipped.
-    for index in (0..=4).chain(9..=21).chain(32..=136) {
-        let text = std::fs::read_to_string(format!("{dir}/{index}")).unwrap();
-        let sections = blocks(&text);
-        let name = sections["name"][0].to_string();
+    for (index, name, vendored) in source.iter().map(|(i, n, f)| (*i, n, f.clone())) {
         let label = format!("[{index}] {name}");
 
         let key = match (conway_built(index), repaired(index, read)) {
             (Some(p), _) => p.polydex_key(),
             (_, Some(faces)) => key_from_faces(faces, &label),
-            // File 32 has only a 2D net too, and the triakis tetrahedron is `kT`.
+            // Entry 32 is a 2D net too, and the triakis tetrahedron is `kT`.
             _ if index == 32 => {
                 let tetra = read(0);
                 key_from_faces((0..4).fold(tetra, |f, _| augment(&f, 0)), &label)
             }
-            _ => key_from_faces(faces(&sections["solid"]), &label),
+            _ => key_from_faces(vendored, &label),
         };
 
-        // Cross-check against netlib's own `:sfaces`/`:svertices` summaries. These
-        // are hand-written and demonstrably buggy (file 17 claims 30 triangles for
-        // the truncated dodecahedron, which has 20), so a mismatch only warns.
-        let counts = |half: usize| -> usize {
-            key.split('|')
-                .nth(half)
-                .unwrap()
-                .split([',', ';'])
-                .map(|run| run.split('@').next().unwrap().parse::<usize>().unwrap())
-                .sum()
-        };
-        for (half, block) in [(0, "svertices"), (1, "sfaces")] {
-            let claimed: usize = sections[block][0]
-                .split_whitespace()
-                .next()
-                .unwrap()
-                .parse()
-                .unwrap();
-            if claimed != counts(half) {
-                println!(
-                    "WARN {label}: :{block} says {claimed}, generated {}",
-                    counts(half)
-                );
-            }
-        }
-
-        let (title, johnson) = rename(&name);
+        let (title, johnson) = rename(name);
         let category = match johnson {
             Some(n) => format!("Johnson {n}"),
             None => category(index).to_string(),
