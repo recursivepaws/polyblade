@@ -1,2 +1,2 @@
 mod menu;
-pub use menu::MenuBar;
+pub use menu::{MenuBar, PolydexLabel};

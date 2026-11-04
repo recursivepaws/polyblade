@@ -458,6 +458,26 @@ impl Polyhedron {
             .collect()
     }
 
+    /// Cheap change detector for the polydex lookup.
+    /// Any topology change moves one of these, even operations that skip the `Name` transaction.
+    pub fn polydex_stamp(&self) -> (String, usize, usize) {
+        (
+            self.name.clone(),
+            self.shape.order(),
+            self.shape.cycles.len(),
+        )
+    }
+
+    /// Topological fingerprint for the polydex lookup; see `crate::polydex::key`.
+    pub fn polydex_key(&self) -> String {
+        let degrees: Vec<usize> = self
+            .shape
+            .vertices()
+            .map(|v| self.shape.degree(v))
+            .collect();
+        crate::polydex::key(&degrees, &self.face_signatures())
+    }
+
     /// Fresh, no-history color assignment: one slot per distinct signature, sorted canonically.
     /// Used when there's no prior shape to preserve continuity from (construction time).
     fn bootstrap_face_colors(&mut self) {

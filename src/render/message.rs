@@ -51,6 +51,46 @@ pub fn schlegel_face_options() -> Vec<FaceTypeOption> {
     SCHLEGEL_FACE_OPTIONS.lock().unwrap().clone()
 }
 
+/// What the polydex label shows.
+/// For shapes the table doesn't know, `name` falls back to the Conway string and `category` to "Unknown".
+#[derive(Clone, Default, PartialEq)]
+pub struct PolydexInfo {
+    pub name: String,
+    pub category: String,
+    pub conway: String,
+    /// Wikipedia article title, or empty when there is no article to link.
+    pub wiki: String,
+}
+
+/// Conway name, vertex count, face count; see `Polyhedron::polydex_stamp`.
+type PolydexStamp = (String, usize, usize);
+
+/// Identity of the settled polyhedron, published like the Schlegel options above.
+static POLYDEX: std::sync::Mutex<Option<(PolydexStamp, PolydexInfo)>> = std::sync::Mutex::new(None);
+
+pub fn polydex_info() -> Option<PolydexInfo> {
+    POLYDEX.lock().unwrap().as_ref().map(|(_, i)| i.clone())
+}
+
+/// Re-identifies the polyhedron whenever its stamp changes, which keeps the lookup off the frame path.
+fn refresh_polydex(polyhedron: &crate::polyhedron::Polyhedron) {
+    let stamp = polyhedron.polydex_stamp();
+    let mut slot = POLYDEX.lock().unwrap();
+    if slot.as_ref().is_some_and(|(s, _)| *s == stamp) {
+        return;
+    }
+    let entry = crate::polydex::lookup(&polyhedron.polydex_key());
+    *slot = Some((
+        stamp,
+        PolydexInfo {
+            name: entry.map_or_else(|| polyhedron.name.clone(), |e| e.name.to_string()),
+            category: entry.map_or("Unknown", |e| e.category).to_string(),
+            conway: polyhedron.name.clone(),
+            wiki: entry.map_or("", |e| e.wiki).to_string(),
+        },
+    ));
+}
+
 #[derive(Debug, Clone, Display)]
 pub enum PolybladeMessage {
     Tick(Instant),
@@ -67,6 +107,24 @@ pub enum PresetMessage {
     Octahedron,
     Dodecahedron,
     Icosahedron,
+}
+
+impl PresetMessage {
+    /// Conway notation seed letter, which operators prefix themselves onto.
+    /// Distinct from `Display`, which is the human-readable menu label.
+    pub fn conway_seed(&self) -> String {
+        use PresetMessage::*;
+        match self {
+            Pyramid(3) => "T".into(),
+            Prism(4) => "C".into(),
+            Octahedron => "O".into(),
+            Dodecahedron => "D".into(),
+            Icosahedron => "I".into(),
+            Prism(n) => format!("P{n}"),
+            AntiPrism(n) => format!("A{n}"),
+            Pyramid(n) => format!("Y{n}"),
+        }
+    }
 }
 
 impl Display for PresetMessage {
@@ -316,6 +374,7 @@ impl ProcessMessage<AppState> for PolybladeMessage {
                 }
 
                 state.update_state(*time);
+                refresh_polydex(&state.model.polyhedron);
 
                 if state.render.schlegel {
                     let options = state.model.polyhedron.schlegel_face_options();

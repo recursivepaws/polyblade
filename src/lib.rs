@@ -1,6 +1,7 @@
 pub mod graphics;
 #[cfg(all(not(target_arch = "wasm32"), feature = "native"))]
 pub mod native_paint;
+pub mod polydex;
 pub mod polyhedron;
 pub mod render;
 
