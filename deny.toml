@@ -22,6 +22,12 @@ ignore = [
   # rendering stack. No fix available upstream yet.
   "RUSTSEC-2026-0206",
   "RUSTSEC-2026-0192",
+  # `zvariant`, `zvariant_derive` and `zbus_names` (zbus 4 era) are unmaintained
+  # (no CVE), pulled in transitively via accesskit_unix/atspi in the `native`
+  # feature's accessibility stack. No fix available upstream yet.
+  "RUSTSEC-2026-0370",
+  "RUSTSEC-2026-0371",
+  "RUSTSEC-2026-0372",
 ]
 
 [licenses]
